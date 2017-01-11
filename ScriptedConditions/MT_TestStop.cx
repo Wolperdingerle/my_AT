@@ -1,0 +1,238 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+	[Description("MT-Test-Stop")]
+	[IsEntryAttribute(false)]
+	[IsStopAttribute(true)]
+	[IsTargetAttribute(false)]
+	[OverrulePreviousStopPrice(true)]
+	public class MT_TestStop : UserScriptedCondition
+	{
+		#region Variables
+
+		private int _abstand = 2;
+        private int Toleranz = 2;
+        private int delta = 5;
+        private double Stopp = 0.00;
+        private bool _softstopp = true;
+
+		#endregion
+
+		protected override void OnInit()
+		{
+			IsEntry = false;
+			IsStop = true;
+			IsTarget = false;
+			Add(new Plot(Color.FromKnownColor(KnownColor.Black), "Occurred"));
+			Add(new Plot(Color.FromArgb(255, 254, 168, 248), "Stop1"));
+			Add(new Plot(Color.FromArgb(255, 183, 93, 94), "Stop2"));
+			IsOverlay = true;
+			CalculateOnClosedBar = true;
+		}
+
+        protected override void OnCalculate()
+        {
+            //TODO: Write your owner OnBarUpdate handling
+
+            if (!FirstTickOfBar) return;
+
+
+            if (IsProcessingBarIndexLast)
+            {
+
+                if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);    // Tick-Abstand
+
+                delta = (int)(Close[1] / 10 + 1);    // Differnenz Stopp-Limit-Preis, noc ohne Auswirkung
+
+                // Stopp-Berechnung: bei InsideBar zur�ck auf Aussenstab, sonst BarByBar
+                if (InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, Toleranz).IsInsideBar[0] > 0)
+                {
+                    Stopp = Instrument.Round2TickSize(InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, Toleranz).LowBeforeOutsideBar[0]);
+                }
+                else Stopp = Instrument.Round2TickSize(Math.Max(Stopp, Low[1]));
+                if (_softstopp && Close[1] < Stopp)
+                {
+                    Stopp = Instrument.Round2TickSize(Math.Max(Low[1], Stopp));
+                }
+                if (Stopp < Close[1])
+                {
+                    Occurred.Set(1);
+                    Stop1.Set(Low[1]);
+                }
+                else
+                {
+                    Occurred.Set(0);
+                    Stop1.Set(Stopp);
+                }
+            }
+        }
+
+        #region Properties
+
+        [Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Occurred
+		{
+			get { return Outputs[0]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Stop1
+		{
+			get { return Outputs[1]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Stop2
+		{
+			get { return Outputs[2]; }
+		}
+
+		public override IList<DataSeries> GetStops()
+		{
+			return new[]{Stop1, Stop2};
+		}
+
+		[Description("Abstand vom Low")]
+		[Category("Parameters")]
+		public int Abstand
+		{
+			get { return _abstand; }
+			set { _abstand = Math.Max(1, value); }
+		}
+
+		#endregion
+	}
+}
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator
+	{
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(System.Int32 abstand)
+        {
+			return MT_TestStop(InSeries, abstand);
+		}
+
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(IDataSeries input, System.Int32 abstand)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<MT_TestStop>(input, i => i.Abstand == abstand);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new MT_TestStop
+						{
+							RequiredBarsCount = RequiredBarsCount,
+							CalculateOnClosedBar = CalculateOnClosedBar,
+							InSeries = input,
+							Abstand = abstand
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(System.Int32 abstand)
+		{
+			return LeadIndicator.MT_TestStop(InSeries, abstand);
+		}
+
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(IDataSeries input, System.Int32 abstand)
+		{
+			if (IsInInit && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
+
+			return LeadIndicator.MT_TestStop(input, abstand);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(System.Int32 abstand)
+		{
+			return LeadIndicator.MT_TestStop(InSeries, abstand);
+		}
+
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(IDataSeries input, System.Int32 abstand)
+		{
+			return LeadIndicator.MT_TestStop(input, abstand);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(System.Int32 abstand)
+		{
+			return LeadIndicator.MT_TestStop(InSeries, abstand);
+		}
+
+		/// <summary>
+		/// MT-Test-Stop
+		/// </summary>
+		public MT_TestStop MT_TestStop(IDataSeries input, System.Int32 abstand)
+		{
+			return LeadIndicator.MT_TestStop(input, abstand);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion

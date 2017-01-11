@@ -1,0 +1,266 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+	[Description("Entry-Signal für Strategie BT und PingPong")]
+	[IsEntryAttribute(true)]
+	[IsStopAttribute(false)]
+	[IsTargetAttribute(false)]
+	[OverrulePreviousStopPrice(false)]
+	public class BT_Entry : UserScriptedCondition
+	{
+		#region Variables
+
+		private int _trend = 2;
+		private int _periode = 500;
+        private double P1;
+        private double P2;
+        private double P3;
+        private bool EnterSignal;
+        private double _korrekturfaktor = 0.1;
+		#endregion
+
+		protected override void OnInit()
+		{
+			IsEntry = true;
+			IsStop = false;
+			IsTarget = false;
+			Add(new Plot(Color.FromKnownColor(KnownColor.Black), "Occurred"));
+			Add(new Plot(Color.FromArgb(255, 244, 190, 86), "Entry"));
+			IsOverlay = true;
+			CalculateOnClosedBar = true;
+            RequiredBarsCount = 500;
+            Trend = _trend;
+		}
+       protected override void OnCalculate()
+		{
+
+            if (ProcessingBarIndex < RequiredBarsCount)
+            {
+                Occurred.Set(0);            // Keinen Einstieg generieren
+                Entry.Set(DataSeries.InvisibleValue);
+                return;
+            }
+          // if(Occurred[1] ==1)
+            
+            // Einstiegssignal berechnen: Stopp über High[0] in der Korrektur
+            // P 2 3 und P3? im Aufwärtstrend
+
+            if (P123Adv(_trend).ValidP3Price[0] > 0 && P123Adv(_trend).ValidP3Price[0] < P123Adv(_trend).P2Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).ValidP3DateTime[0] &&
+                High[0] < (P123Adv(_trend).P2Price[0] - (P123Adv(_trend).P2Price[0] - P123Adv(_trend).ValidP3Price[0]) * _korrekturfaktor))
+              //    P123Adv(Trend).TempP3DateTime[0] > P123Adv(Trend).P2DateTime[0])
+            // && (Close[0] > EMA(200)[0]); // && (MFI(14)[0] < 30);
+            {
+            
+                //P1 = P123Adv(Trend).P1Price[0];
+                P2 = P123Adv(_trend).P2Price[0];
+                P3 = P123Adv(_trend).ValidP3Price[0];
+                //P3temp = P123Adv(Trend).TempP3Price[0];
+                EnterSignal = true;
+            }
+            else
+            {
+                EnterSignal = false;
+
+            }
+            if(IsProcessingBarIndexLast)
+            {
+            //Print(Instrument.Symbol + " Einstieg: " + EnterSignal + " P2: " + P123Adv(Trend).P2Price[0] + " P1 Zeit: " + P123Adv(Trend).P1DateTime[0] +
+            //    " P2 Zeit: " + P123Adv(Trend).P2DateTime[0] + " P3 " + P123Adv(Trend).ValidP3Price[0] + " P3 Zeit: " + P123Adv(Trend).ValidP3DateTime[0] +
+            //    " P3Temp " + P123Adv(Trend).TempP3Price[0] + " P3Temp Zeit: " + P123Adv(Trend).TempP3DateTime[0]);
+            
+            }
+            if(EnterSignal) 
+            {
+                Occurred.Set(1);            // Long-Einstieg generieren
+                Entry.Set(Close[0]);        
+                return;
+
+            }
+                else 
+            {
+                Occurred.Set(0);
+                Entry.Set(Entry[1]);
+            }
+
+		}
+
+		#region Properties
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Occurred
+		{
+			get { return Outputs[0]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Entry
+		{
+			get { return Outputs[1]; }
+		}
+
+		public override IList<DataSeries> GetEntries()
+		{
+			return new[]{Entry};
+		}
+
+		[Description("Trendgröße")]
+		[Category("Parameters")]
+		public int Trend
+		{
+			get { return _trend; }
+			set { _trend = Math.Max(1, value); }
+		}
+
+        [Description("Korrekturfaktor")]
+        [Category("Parameters")]
+        public double Korrekturfaktor
+        {
+            get { return _korrekturfaktor; }
+            set { _korrekturfaktor = Math.Min(0.1, Math.Max(0.9, value)); }
+        }
+
+		[Description("")]
+		[Category("Parameters")]
+		public int Periode
+		{
+			get { return _periode; }
+			set { _periode = Math.Max(1, value); }
+		}
+
+		#endregion
+	}
+}
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator
+	{
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+        {
+			return BT_Entry(InSeries, trend, korrekturfaktor, periode);
+		}
+
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(IDataSeries input, System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<BT_Entry>(input, i => i.Trend == trend && Math.Abs(i.Korrekturfaktor - korrekturfaktor) <= Double.Epsilon && i.Periode == periode);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new BT_Entry
+						{
+							RequiredBarsCount = RequiredBarsCount,
+							CalculateOnClosedBar = CalculateOnClosedBar,
+							InSeries = input,
+							Trend = trend,
+							Korrekturfaktor = korrekturfaktor,
+							Periode = periode
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			return LeadIndicator.BT_Entry(InSeries, trend, korrekturfaktor, periode);
+		}
+
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(IDataSeries input, System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			if (IsInInit && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
+
+			return LeadIndicator.BT_Entry(input, trend, korrekturfaktor, periode);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			return LeadIndicator.BT_Entry(InSeries, trend, korrekturfaktor, periode);
+		}
+
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(IDataSeries input, System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			return LeadIndicator.BT_Entry(input, trend, korrekturfaktor, periode);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			return LeadIndicator.BT_Entry(InSeries, trend, korrekturfaktor, periode);
+		}
+
+		/// <summary>
+		/// Entry-Signal für Strategie BT und PingPong
+		/// </summary>
+		public BT_Entry BT_Entry(IDataSeries input, System.Int32 trend, System.Double korrekturfaktor, System.Int32 periode)
+		{
+			return LeadIndicator.BT_Entry(input, trend, korrekturfaktor, periode);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion

@@ -1,0 +1,290 @@
+    using System;
+    using System.Collections.Generic;
+    using System.ComponentModel;
+    using System.Drawing;
+    using System.Drawing.Drawing2D;
+    using System.Linq;
+    using System.Xml;
+    using System.Xml.Serialization;
+    using AgenaTrader.API;
+    using AgenaTrader.Custom;
+    using AgenaTrader.Plugins;
+    using AgenaTrader.Helper;
+
+    namespace AgenaTrader.UserCode
+    {
+    //[TimeFrameRequirements("1 Day")]
+    [TimeFrameRequirements("1 Day", "1 Hour","10 Minute", "5 Minute", "1 Minute")]  //Bereitstellung von MTF für evtl. Verwendung in angeschlossenen Conditions
+
+    [Description("Dynamische Listenverwaltung anhand einer Condition")]
+       public class Add2List : UserIndicator
+       {
+          #region Variables
+
+
+                private string _name_of_sourcelist = String.Empty;
+                private string _name_of_destlist = String.Empty;
+                private string _name_of_condition =String.Empty;
+                private IInstrumentsList _sourcelist = null;
+                private IInstrumentsList _destlist = null;
+                private double _condiOccurred = 0;
+               
+        #endregion
+
+        protected override void OnInit()
+            {
+            Add(new Plot(Color.FromKnownColor(KnownColor.Orange), "MOFL"));
+            IsAddDrawingsToPricePanel = false;
+            CalculateOnClosedBar = true;
+            }
+
+
+            protected override void OnStart()
+            {
+                if (this.Instrument != null)                  //Wenn ein Instrument aktuell vorhanden ist
+                {
+                    if (!String.IsNullOrEmpty(Name_of_SourceList))      //Checks & laden der Source-List      
+                    {
+                        this.Root.Core.InstrumentManager.GetInstrumentLists();          
+                        _sourcelist = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this.Name_of_SourceList);
+
+                        if (_sourcelist == null)         
+                        {
+                            Log(this.DisplayName + ": Die Quelliste " + this.Name_of_SourceList + " existiert nicht!", InfoLogLevel.Warning);
+                        }
+                    }
+                    else                                 //wenn keine Liste angegeben...
+                    {
+                        Log(this.DisplayName + ": Keine Quellliste angegeben!.", InfoLogLevel.Warning);
+                    }
+                   
+                   
+                   
+                    if (!String.IsNullOrEmpty(Name_of_DestList))            // und der String Zielliste vorhanden ist
+                    {
+                        _destlist = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this.Name_of_DestList);
+
+                        if (_destlist == null)         //falls Instrumentliste nicht vorhanden...
+                        {
+                            Log(this.DisplayName + ": Die Zielliste " + this.Name_of_DestList + " existiert nicht!", InfoLogLevel.Warning);
+                        }
+                    }
+                    else                                 //wenn keine Liste angegeben...
+                    {
+                        Log(this.DisplayName + ": Keine Zielliste angegeben!", InfoLogLevel.Warning);
+                    }
+
+
+                if(String.IsNullOrEmpty(Name_of_Condition))
+                {
+                   Log(this.DisplayName + ": Es wurde keine Condition angegeben!", InfoLogLevel.Warning);
+                }
+                }
+            }
+
+
+          protected override void OnCalculate()
+          {
+           
+            if (_sourcelist != null && _sourcelist.Count > 0)
+            {
+               
+                for (int i = 1; i < _sourcelist.Count; i++)
+                    {
+                    
+                    
+                    // Signal vorhanden =>> in Zielliste aufnehmen, nicht vorhanden? =>> aus Zielliste entfernen
+                    _condiOccurred = GetCondition(Name_of_Condition)[0];
+                    MOFL.Set(_condiOccurred);
+                    Print("Symbol: "+ _sourcelist[i].Symbol + " MOfL: " + _condiOccurred + " Länge Source-Liste: " + _sourcelist.Count+  " Name: " + _sourcelist.Name);
+                    
+                }
+
+            }
+            
+                if (this.IsProcessingBarIndexLast && _sourcelist != null && _sourcelist.Count > 0)
+                {
+                   _condiOccurred = GetCondition(Name_of_Condition)[0];
+                   MOFL.Set(_condiOccurred);      
+                
+                    if (_condiOccurred==1 && !_destlist.Contains((Instrument)this.Instrument))
+                    {
+                        this.Root.Core.InstrumentManager.AddInstrument2List(this.Instrument, this.Name_of_DestList);
+                    Print("Instrument zu Ziel-Liste : " + this.Instrument.Symbol);
+                   
+                    }
+                
+                
+                    if (_condiOccurred==0 && _destlist.Contains((Instrument)this.Instrument))
+                    {
+                        this.Root.Core.InstrumentManager.RemoveInstrumentFromList(this.Name_of_DestList, this.Instrument);
+                        Print("Instrument von Ziel-Liste entfernt: " + this.Instrument.Symbol);
+                    }            
+                    
+                }
+                
+          }
+
+            #region Properties
+
+               #region Output
+
+               [Browsable(false)]
+               [XmlIgnore()]
+               [DisplayName("MemberOfList")]
+               public DataSeries MOFL
+                {
+                  get { return Outputs[0]; }
+                }
+
+               #endregion
+
+               #region Input
+
+                [Description("Name der Quellliste.")]
+                //[Category("Values")]
+                [DisplayName("Source list")]
+                public string Name_of_SourceList
+                {
+                    get { return _name_of_sourcelist; }
+                    set { _name_of_sourcelist = value; }
+                }
+
+                [Description("Name der Zielliste.")]
+                //[Category("Values")]
+                [DisplayName("Destination list")]
+                public string Name_of_DestList
+                {
+                    get { return _name_of_destlist; }
+                    set { _name_of_destlist = value; }
+                }
+
+                [Description("Name der Condition.")]
+                //[Category("Values")]
+                [DisplayName("Name der Condition")]
+                public string Name_of_Condition
+                {
+                    get { return _name_of_condition; }
+                    set { _name_of_condition = value; }
+                }
+                #endregion
+          #endregion
+         }
+    }
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator
+	{
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List()
+        {
+			return Add2List(InSeries);
+		}
+
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List(IDataSeries input)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<Add2List>(input);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new Add2List
+						{
+							RequiredBarsCount = RequiredBarsCount,
+							CalculateOnClosedBar = CalculateOnClosedBar,
+							InSeries = input
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List()
+		{
+			return LeadIndicator.Add2List(InSeries);
+		}
+
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List(IDataSeries input)
+		{
+			if (IsInInit && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
+
+			return LeadIndicator.Add2List(input);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List()
+		{
+			return LeadIndicator.Add2List(InSeries);
+		}
+
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List(IDataSeries input)
+		{
+			return LeadIndicator.Add2List(input);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List()
+		{
+			return LeadIndicator.Add2List(InSeries);
+		}
+
+		/// <summary>
+		/// Dynamische Listenverwaltung anhand einer Condition
+		/// </summary>
+		public Add2List Add2List(IDataSeries input)
+		{
+			return LeadIndicator.Add2List(input);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion

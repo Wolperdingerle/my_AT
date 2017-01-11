@@ -1,0 +1,210 @@
+    namespace AgenaTrader.UserCode
+    {
+       [Description("Indikator, der in einer ListChartGroup einen Wert anzeigt wenn das Instrument sich bereits in einer ANDEREN Liste befindet. (MemberOfList)")]
+       public class MOL : UserIndicator
+       {
+          #region Variables
+          private string _name_of_checklist11 = String.Empty;
+          private string _name_of_checklist12 = String.Empty;
+          private string _name_of_checklist21 = String.Empty;
+          private string _name_of_checklist22 = String.Empty;
+          private string _name_of_checklist31 = String.Empty;
+          private string _name_of_checklist32 = String.Empty;
+
+          private IInstrumentsList _checklist11 = null;
+          private IInstrumentsList _checklist12 = null;
+          private IInstrumentsList _checklist21 = null;
+          private IInstrumentsList _checklist22 = null;
+          private IInstrumentsList _checklist31 = null;
+          private IInstrumentsList _checklist32 = null;
+          
+          private int _molValue11 = 11;
+          private int _molValue12 = 12;
+          private int _molValue21 = 21;
+          private int _molValue22 = 22;
+          private int _molValue31 = 31;
+          private int _molValue32 = 32;
+          
+          #endregion
+
+            protected override void OnStartUp()
+            {
+                if (this.Instrument != null)                  //Wenn ein Instrument aktuell vorhanden ist
+                {
+                 this.Root.Core.InstrumentManager.GetInstrumentLists();   
+                 
+                 if (!String.IsNullOrEmpty(_name_of_checklist11))                                       //Laden und überprüfen Liste 1.1
+                    {
+                        _checklist11 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist11);
+                        if (_checklist11 == null)   Log(this.DisplayName + ": Die Liste " + this._name_of_checklist11 + " existiert nicht!", InfoLogLevel.Warning);
+                    }
+                 
+                 if (!String.IsNullOrEmpty(_name_of_checklist12))                                       //Laden und überprüfen Liste 1.2
+                    {
+                        _checklist12 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist12);
+                        if (_checklist12 == null)   Log(this.DisplayName + ": Die Liste " + this._name_of_checklist12 + " existiert nicht!", InfoLogLevel.Warning);
+                    }
+                 
+                 if (!String.IsNullOrEmpty(_name_of_checklist21))                                       //Laden und überprüfen Liste 2.1
+                    {
+                        _checklist21 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist21);
+                        if (_checklist21 == null)    Log(this.DisplayName + ": Die Liste " + this._name_of_checklist21 + " existiert nicht!", InfoLogLevel.Warning);
+                    }
+                 
+                 if (!String.IsNullOrEmpty(_name_of_checklist22))                                       //Laden und überprüfen Liste 2.2
+                    {
+                        _checklist22 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist22);
+                        if (_checklist22 == null)   Log(this.DisplayName + ": Die Liste " + this._name_of_checklist22 + " existiert nicht!", InfoLogLevel.Warning);
+
+                    }
+
+                 if (!String.IsNullOrEmpty(_name_of_checklist31))                                       //Laden und überprüfen Liste 3.1
+                    {
+                        _checklist31 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist31);
+                        if (_checklist31 == null)   Log(this.DisplayName + ": Die Liste " + this._name_of_checklist31 + " existiert nicht!", InfoLogLevel.Warning);
+                    }
+                 
+                 if (!String.IsNullOrEmpty(_name_of_checklist32))                                       //Laden und überprüfen Liste 3.2
+                    {
+                        _checklist32 = this.Root.Core.InstrumentManager.GetInstrumentsListStatic(this._name_of_checklist32);
+                        if (_checklist32 == null)   Log(this.DisplayName + ": Die Liste " + this._name_of_checklist32 + " existiert nicht!", InfoLogLevel.Warning);
+                    }
+
+
+                }
+            }
+
+          protected override void Initialize()
+          {
+             Add(new Plot(Color.FromArgb(255, 0, 0, 0), PlotStyle.Bar, "MoLs"));
+             CalculateOnBarClose = true;
+          }
+
+          protected override void OnBarUpdate()
+          {
+              if (this.IsCurrentBarLast)
+              {
+                  MoLs.Set(0);
+                  bool taken = false;
+                  if(!taken &&_checklist11 != null && _checklist11.Count > 0 && _checklist11.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue11); taken=true; }
+                 if(!taken &&_checklist12 != null && _checklist12.Count > 0 && _checklist12.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue12); taken=true; }
+                 if(!taken &&_checklist21 != null && _checklist21.Count > 0 && _checklist21.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue21); taken=true; }
+                 if(!taken &&_checklist22 != null && _checklist22.Count > 0 && _checklist22.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue22); taken=true; }
+                 if(!taken &&_checklist31 != null && _checklist31.Count > 0 && _checklist31.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue31); taken=true; }
+                 if(!taken &&_checklist32 != null && _checklist32.Count > 0 && _checklist32.Contains((Instrument)this.Instrument)) { MoLs.Set(_molValue32); taken=true; }
+                }
+          }
+
+          #region Properties
+
+           
+
+               [Browsable(false)]
+               [XmlIgnore()]
+               [DisplayName("MemberOfLists")]
+               public DataSeries MoLs
+                {
+                  get { return Values[0]; }
+                }
+         
+
+                [Description("Name der zu überwachenden Liste 1.1")]
+                [Category("Parameters")]
+                [DisplayName("ListName 1.1")]
+                public string Name_of_Checklist11
+                {
+                    get { return _name_of_checklist11; }
+                    set { _name_of_checklist11 = value; }
+                }
+                [Description("Name der zu überwachenden Liste 1.2")]
+                [Category("Parameters")]
+                [DisplayName("ListName 1.2")]
+                public string Name_of_Checklist12
+                {
+                    get { return _name_of_checklist12; }
+                    set { _name_of_checklist12 = value; }
+                }
+                [Description("Name der zu überwachenden Liste 2.1")]
+                [Category("Parameters")]
+                [DisplayName("ListName 2.1")]
+                public string Name_of_Checklist21
+                {
+                    get { return _name_of_checklist21; }
+                    set { _name_of_checklist21 = value; }
+                }
+                [Description("Name der zu überwachenden Liste 2.2")]
+                [Category("Parameters")]
+                [DisplayName("ListName 2.2")]
+                public string Name_of_Checklist22
+                {
+                    get { return _name_of_checklist22; }
+                    set { _name_of_checklist22 = value; }
+                }           
+                [Description("Name der zu überwachenden Liste 3.1")]
+                [Category("Parameters")]
+                [DisplayName("ListName 3.1")]
+                public string Name_of_Checklist31
+                {
+                    get { return _name_of_checklist31; }
+                    set { _name_of_checklist31 = value; }
+                }               
+                [Description("Name der zu überwachenden Liste 3.2")]
+                [Category("Parameters")]
+                [DisplayName("ListName 3.2")]
+                public string Name_of_Checklist32
+                {
+                    get { return _name_of_checklist32; }
+                    set { _name_of_checklist32 = value; }
+                }
+               
+               [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 1.1 ")]
+             public int MOLListenwert11
+             {
+                get { return _molValue11; }
+                set { _molValue11 =value; }
+             }
+             [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 1.2 ")]
+             public int MOLListenwert12
+             {
+                get { return _molValue12; }
+                set { _molValue12 =value; }
+             }
+             [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 2.1 ")]
+             public int MOLListenwert21
+             {
+                get { return _molValue21; }
+                set { _molValue21 =value; }
+             }
+               [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 2.2 ")]
+             public int MOLListenwert22
+             {
+                get { return _molValue22; }
+                set { _molValue22 =value; }
+             }
+               [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 3.1 ")]
+             public int MOLListenwert31
+             {
+                get { return _molValue31; }
+                set { _molValue31 =value; }
+             }         
+               [Description("Wert, welcher ausgegeben werden soll falls das Instument sich in der Liste befindet ")]
+             [Category("Parameters")]
+             [DisplayName("Value MoL 3.2 ")]
+             public int MOLListenwert32
+             {
+                get { return _molValue32; }
+                set { _molValue32 =value; }
+             }            
+          #endregion
+       }
+    }

@@ -1,0 +1,287 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+	[Description("Bewegungsstopp als Softstopp mit einstellbarem Volumen")]
+
+    public class Beweg_Soft_Stop : UserStrategy
+	{
+        #region Variables
+       
+        private int _abstand = 2;
+        private bool _automatisch = true;
+        private bool _profitOnly = true;
+        private int _verkauf_Vol = 100;
+        private IOrder oStop;
+        private double Stopp;
+        private int Stueck;
+        private double _profit = 3;
+        private bool _sendMail = true;
+        private string BStopp = "Bewegungs-Soft-Stopp";
+        private bool _stopLimit = false;
+        private int delta = 0;
+        private bool _softstopp = true;
+        private int _toleranz = 2;
+        //private Test2Plot _Test2Plot = null;
+        
+
+        #endregion
+
+        protected override void Initialize()
+		{
+			CalculateOnBarClose = true;
+            BarsRequired = 3;
+            IsAutomated = _automatisch;
+            Abstand = _abstand;
+            Toleranz = _toleranz;
+            Verkauf_Vol = _verkauf_Vol;
+            SoftStopp = _softstopp;
+
+
+        }
+
+        protected override void OnExecution(IExecution execution)
+        {
+
+            if (execution.Order != null && execution.Order.OrderState == OrderState.Filled)
+            {
+                if (oStop != null && execution.Name == oStop.Name)
+                {
+                    if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
+                         execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt.",
+                         execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt. Profit:" + (Trade.ClosedProfitLoss - execution.Commission).ToString("F2"));
+                    
+                }
+            }
+        }
+		protected override void OnBarUpdate()
+		{
+            if (IsCurrentBarLast)
+            {
+
+                #region vorhandene Stop-Order holen
+                if (Trade != null && Trade.Quantity != 0)
+                {
+                    if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);
+                    if (Orders.Count > 0)
+                    {
+                        int i = 0;
+                        do
+                        {
+                            if (Orders[i].Action == OrderAction.Sell && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
+                            {
+                                oStop = Orders[i];
+                                // if (oStop.OrderState != OrderState.Filled)
+                            //     Stopp = Orders[i].StopPrice + _abstand * TickSize;
+                            }
+                            ++i;
+                        } while (i < Orders.Count);
+                    }
+                }
+
+                #endregion vorhandene Stop-Order holen
+        
+                #region Stueck
+                if (Trade == null && ChartControl != null)
+                {
+                    DrawTextFixed("MyText", " kein Trade offen ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
+                    return;
+                }
+                if (Trade.Quantity * Trade.AvgPrice < 8000)     // verkaufe alles
+                {
+                    Stueck = Trade.Quantity;
+                }
+                else if (Trade.Quantity * Trade.AvgPrice < 12000)   // verkaufe alles oder die Hälfte
+                {
+                    if (_verkauf_Vol <= (int)(Trade.Quantity / 2)+1)
+                        Stueck = (int)(Trade.Quantity / 2);
+                    else
+                        Stueck = Trade.Quantity;
+                }
+                else if (_verkauf_Vol == Trade.Quantity)        // verkaufe alles oder ein Teilbetrag >= 4000
+                {
+                    Stueck = Trade.Quantity;
+                }
+                
+                else
+                {
+                    _verkauf_Vol = Math.Min((int)(Trade.Quantity), _verkauf_Vol); // _verk-Vol <= Trade.Quantity
+                    _verkauf_Vol = Math.Max((int)((4000/Trade.AvgPrice)+1), _verkauf_Vol);
+                //_verkauf_Vol = Math.Min((int)(Trade.Quantity - _verkauf_Vol), (int)(4000 / Trade.AvgPrice));   
+                    if ((Trade.Quantity - _verkauf_Vol)* Trade.AvgPrice < 4000)                 //  Restmenge muß über 4.000 Eur liegen
+                    {
+                        _verkauf_Vol = Trade.Quantity - (int)((4000 / Trade.AvgPrice) + 1);     // Restmenge = 4000
+                    }
+                    Stueck = _verkauf_Vol;
+                }
+
+                if (oStop != null && oStop.OrderState == OrderState.Filled)
+                {
+                    DrawTextFixed("MyText", " Bewegunsstopp ausgeführt ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
+                    return;
+                }
+
+                
+                if (Trade == null || (Trade != null && (Trade.MarketPosition == PositionType.Flat) || Trade.Quantity < _verkauf_Vol))
+                {
+                    return;
+                }
+                #endregion Stueck
+ 
+
+                if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);    // Tick-Abstand
+                
+                delta = (int)(Close[1] / 10 +1);    // Differnenz Stopp-Limit-Preis, noch ohne Auswirkung
+
+                #region Stopp_Berechnung
+                // Stopp-Berechnung: bei InsideBar zurück auf Aussenstab, sonst BarByBar
+                if (InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] > 0) 
+                    Stopp = Instrument.Round2TickSize(InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
+                        // ggf oStop zurücksetzen
+                        if (oStop != null && oStop.StopPrice > Stopp)
+                        {
+                            ChangeOrder(oStop, Stueck, Stopp - ( delta) * TickSize, Stopp);
+                            Print("Stop-Preis: " + oStop.Price + " Limit: " + oStop.LimitPrice );
+                        }
+                    
+                else Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (Low[1] - _abstand * TickSize)));
+                if (_softstopp && oStop != null && Close[1] < Stopp - _abstand * TickSize)
+                {
+                    Stopp = Instrument.Round2TickSize(Math.Max(Low[1], Stopp) - _abstand * TickSize);
+                }
+
+                #endregion Stopp_Berechnung
+                //Hardstopp auf Low[1] nachsetzen und damit aktivieren
+
+                #region 1 Hardstopp setzen
+                if (oStop == null &&  (!_profitOnly || (_profitOnly && ((Stopp - Trade.AvgPrice + _abstand* TickSize)/ Trade.AvgPrice) > ( _profit/1000))))  
+                {
+                    if (_softstopp) Stopp = Instrument.Round2TickSize(Trade.AvgPrice *( 1+ _profit/1000));
+                    if (_stopLimit)
+                        oStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Stopp - (_abstand + delta) * TickSize, Stopp - _abstand * TickSize, "Stopp B", BStopp);
+                    else
+                        oStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp - _abstand * TickSize, "Stopp B", BStopp);
+                    if (_automatisch) oStop.ConfirmOrder();
+                }
+                #endregion 1 Hardstopp setzen
+
+                #region Hardstopp auf Low[1] nachsetzen und damit aktivieren
+                if (oStop != null)
+                { 
+                    if (Close[1] < (Stopp - _abstand * TickSize))
+                    {
+                        if ( oStop.OrderState != OrderState.Filled && oStop.OrderState != OrderState.PendingSubmit &&
+                            oStop.OrderState != OrderState.PendingReplace && oStop.Price != Stopp - _abstand * TickSize)
+                        {
+                                ChangeOrder(oStop, Stueck, Stopp - (_abstand + delta) * TickSize, Stopp - _abstand * TickSize);
+                                Print("2 Stop: " + oStop.Price + " Limit:" + oStop.LimitPrice);
+                        }
+                     }
+                }
+                #endregion Hardstopp auf Low[1] nachsetzen und damit aktivieren
+            }
+    
+
+            if(Stopp > 1 )
+            {
+                if (Trade != null && ChartControl != null && oStop != null)
+                {
+                    if (ChartControl != null && _profitOnly) DrawTextFixed("MyText", "Bewegunsstopp für " + Stueck.ToString("F0") + " Stück ProfitOnly " + _profit + " Promille, Soft-Stopp: " + Stopp.ToString("F2") + " Hardstopp: " + oStop.StopPrice, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                    if (ChartControl != null && !_profitOnly) DrawTextFixed("MyText", "Bewegunsstopp für " + Stueck.ToString("F0") + " Stück  Soft-Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                }
+                //if (oStop != null && _Test2Plot != null)
+                //         _Test2Plot.Zeichne(Stopp, oStop.StopPrice);
+                // else _Test2Plot.Zeichne(Stopp, Stopp);
+            }
+           
+            if (oStop != null) Print(Instrument.Symbol + " Bar: " + CurrentBar + " Order-Stueck: " + oStop.Quantity + " Stopp: " + Stopp + " Order-Stop-Preis: " +  oStop.StopPrice + " Order-Limit:" + oStop.LimitPrice);
+        }
+        #region Properties
+        
+        [Description("Verkaufs-Menge")]
+        [Category("Parameters")]
+        public int Verkauf_Vol
+        {
+            get { return _verkauf_Vol; }
+            set { _verkauf_Vol = value; }
+        }
+
+        [Description("Soft-Stopp")]
+        [Category("Parameters")]
+        public bool SoftStopp
+        {
+            get { return _softstopp; }
+            set { _softstopp = value; }
+        }
+
+        [Description("nur Gewinn-Stopp")]
+        [Category("Parameters")]
+        public bool ProfitOnly
+        {
+            get { return _profitOnly; }
+            set { _profitOnly = value; }
+        }
+
+        [Description("Profit im Promille")]
+        [Category("Parameters")]
+        public double Profit
+        {
+            get { return _profit; }
+            set { _profit = Math.Max(0, value); }
+        }
+
+        [Description("Tick-Abstand")]
+        [Category("Parameters")]
+        public int Abstand
+        {
+            get { return _abstand; }
+            set { _abstand = value; }
+        }
+
+        [Description("Toleranz für Inside-Bars")]
+        [Category("Parameters")]
+        public int Toleranz
+        {
+            get { return _toleranz; }
+            set { _toleranz = value; }
+        }
+
+        [Description("Stopp-Limit-Order")]
+        [Category("Parameters")]
+        public bool StopLimit
+        {
+            get { return _stopLimit; }
+            set { _stopLimit = value; }
+        }
+
+        [Description("Automatisch")]
+        [Category("Parameters")]
+        public bool Automatisch
+        {
+            get { return _automatisch; }
+            set { _automatisch = value; }
+        }
+
+
+        [Description("SendMail")]
+        [Category("Parameters")]
+
+        public bool SendMail
+        {
+            get { return _sendMail; }
+            set { _sendMail = value; }
+        }
+        #endregion
+	}
+}

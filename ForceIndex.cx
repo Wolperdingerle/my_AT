@@ -1,0 +1,382 @@
+/*
+ * Force Index based on Elders measure of volume x price change
+ * Copyright (C) 2015 by Stefan Filipiak <support@meinindikator.de>
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#region Using declarations
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+#endregion
+
+namespace AgenaTrader.UserCode
+{
+    public enum ForceIndexMAType { AMA, DEMA, EMA, HMA, SMA, TMA, TEMA, WMA, ZLEMA, None }
+
+    [Description("Force Index based on Elders measure of volume x price change")]
+    public class ForceIndex : UserIndicator
+    {
+        #region Variables
+
+        private int _period;
+        private ForceIndexMAType _maType;
+        private double _numStdDev;
+        private int _periodStdDev;
+        private Color _upColor;
+        private Color _downColor;
+        private Color _upColorMA;
+        private Color _downColorMA;
+
+        private int beginUp;
+        private int beginDown;
+        private int beginUpMA;
+        private int beginDownMA;
+        
+        private DataSeries fi;
+
+        #endregion
+
+        public ForceIndex()
+        {
+            _period = 13;
+            _maType = ForceIndexMAType.EMA;
+            _numStdDev = 2.000;
+            _periodStdDev = 14;
+            _upColor = Color.Green;
+            _downColor = Color.Red;
+
+            BarsRequired = Math.Max(_period, _periodStdDev);
+            DisplayInDataBox = true;
+            PaintPriceMarkers = false;
+        }
+
+        protected override void Initialize()
+        {
+            Add(new Plot(Color.Black, "Force"));
+
+            Add(new Line(Color.DarkGray, 0, "Zero line"));
+            
+            Plots[0].Pen.Width = 2;
+
+            DrawOnPricePanel = false;
+            Overlay = false;
+
+            fi = new DataSeries(this);
+        }
+
+        protected override void OnStartUp()
+        {
+            if (BarsRequired < Math.Max(_period, _periodStdDev))
+            {
+                BarsRequired = Math.Max(_period, _periodStdDev);
+            }
+
+            beginUp = -1;
+            beginDown = -1;
+        }
+
+        protected override void OnBarUpdate()
+        {
+            if (CurrentBar < BarsRequired)
+            {
+                return;
+            }
+
+            #region Force Index
+
+            fi.Set(Volume[0] * (Input[0] - Input[1]));
+
+            switch (_maType) {
+                case ForceIndexMAType.AMA:
+                    Force.Set(AMA(fi, _period, false)[0]);
+                    break;
+                case ForceIndexMAType.DEMA:
+                    Force.Set(DEMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.EMA:
+                    Force.Set(EMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.HMA:
+                    Force.Set(HMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.SMA:
+                    Force.Set(SMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.TMA:
+                    Force.Set(TMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.TEMA:
+                    Force.Set(TEMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.WMA:
+                    Force.Set(WMA(fi, _period)[0]);
+                    break;
+                case ForceIndexMAType.ZLEMA:
+                    Force.Set(ZLEMA(fi, _period)[0]);
+                    break;
+                default:
+                    Force.Set(fi[0]);
+                    break;
+            }
+            
+            #endregion
+
+            #region Visualization
+            
+            if (Force[0] >= 0.0) {
+                // PlotColors[0][0] = _upColor;
+
+                beginDown = -1;
+                if (beginUp == -1) beginUp = CurrentBar;
+                DrawRegion("tag"+beginUp, Math.Min(CurrentBar - beginUp + 1, CurrentBar), 0, Force, 0, Color.Empty, _upColor, 40);
+            } else {
+                // PlotColors[0][0] = _downColor;
+                
+                beginUp = -1;
+                if (beginDown == -1) beginDown = CurrentBar;
+                DrawRegion("tag"+beginDown, Math.Min(CurrentBar - beginDown + 1, CurrentBar), 0, Force, 0, Color.Empty, _downColor, 40);
+            }
+            
+            if (_upColorMA == Color.Transparent && _downColorMA == Color.Transparent)
+                return;
+
+            #endregion
+        }
+
+        #region Properties
+
+            #region Output
+
+            [Browsable(false)]
+            [XmlIgnore()]
+            public DataSeries Force
+            {
+                get { return Values[0]; }
+            }
+
+            #endregion
+
+            #region Input
+
+            [Description("Numbers of bars used for calculations")]
+            [Category("Parameters")]
+            [DisplayNameAttribute("01. Period")]
+            public int Period
+            {
+                get { return _period; }
+                set { _period = Math.Max(1, value); }
+            }
+
+            [Description("Moving average type")]
+            [Category("Parameters")]
+            [DisplayNameAttribute("02. Moving average")]
+            public ForceIndexMAType MAtype
+            {
+                get { return _maType; }
+                set { _maType = value; }
+            }
+
+            [Description("Number of standard deviations")]
+            [Category("Parameters")]
+            [DisplayNameAttribute("03. # of std. dev.")]
+            public double NumStdDev
+            {
+                get { return _numStdDev; }
+                set { _numStdDev = Math.Max(0, value); }
+            }
+
+            [Description("Numbers of bars used for calculations")]
+            [Category("Parameters")]
+            [DisplayNameAttribute("04. Period of std. dev.")]
+            public int PeriodStdDev
+            {
+                get { return _periodStdDev; }
+                set { _periodStdDev = Math.Max(1, value); }
+            }
+
+            [XmlIgnore]
+            [Description("Above zero color")]
+            [Category("Visual")]
+            [DisplayNameAttribute("01. Above zero color")]
+            public Color UpColor
+            {
+                get { return _upColor; }
+                set { _upColor = value; }
+            }
+
+            [Browsable(false)]
+            public string UpColorSerialize
+            {
+                get { return SerializableColor.ToString(_upColor); }
+                set { _upColor = SerializableColor.FromString(value); }
+            }
+
+            [XmlIgnore]
+            [Description("Below zero color")]
+            [Category("Visual")]
+            [DisplayNameAttribute("02. Below zero color")]
+            public Color DownColor
+            {
+                get { return _downColor; }
+                set { _downColor = value; }
+            }
+
+            [Browsable(false)]
+            public string DownColorSerialize
+            {
+                get { return SerializableColor.ToString(_downColor); }
+                set { _downColor = SerializableColor.FromString(value); }
+            }
+
+            #endregion
+
+        #endregion
+    }
+}
+
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator : Indicator
+	{
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+        {
+			return ForceIndex(Input, period, mAtype, numStdDev, periodStdDev);
+		}
+
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(IDataSeries input, System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<ForceIndex>(input, i => i.Period == period && i.MAtype == mAtype && Math.Abs(i.NumStdDev - numStdDev) <= Double.Epsilon && i.PeriodStdDev == periodStdDev);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new ForceIndex
+						{
+							BarsRequired = BarsRequired,
+							CalculateOnBarClose = CalculateOnBarClose,
+							Input = input,
+							Period = period,
+							MAtype = mAtype,
+							NumStdDev = numStdDev,
+							PeriodStdDev = periodStdDev
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			return LeadIndicator.ForceIndex(Input, period, mAtype, numStdDev, periodStdDev);
+		}
+
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(IDataSeries input, System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			if (InInitialize && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
+
+			return LeadIndicator.ForceIndex(input, period, mAtype, numStdDev, periodStdDev);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			return LeadIndicator.ForceIndex(Input, period, mAtype, numStdDev, periodStdDev);
+		}
+
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(IDataSeries input, System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			return LeadIndicator.ForceIndex(input, period, mAtype, numStdDev, periodStdDev);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			return LeadIndicator.ForceIndex(Input, period, mAtype, numStdDev, periodStdDev);
+		}
+
+		/// <summary>
+		/// Force Index based on Elders measure of volume x price change
+		/// </summary>
+		public ForceIndex ForceIndex(IDataSeries input, System.Int32 period, ForceIndexMAType mAtype, System.Double numStdDev, System.Int32 periodStdDev)
+		{
+			return LeadIndicator.ForceIndex(input, period, mAtype, numStdDev, periodStdDev);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion

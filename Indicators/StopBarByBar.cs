@@ -1,0 +1,619 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+
+/*  Indikator BarbyBar-Soft-Stopp unter Berücksichtigung Insidebar MT
+ *  Anzeige des Plots nur bei offener Position
+ *  Softstopp und Hardstopp
+ *  Hardstopp wird bei überschreiten der Gewinnschwelle aktiviert und bleibt dort.
+ *  Ist Close[0] < Softstopp[0]
+ *   Hardstopp unter das letzte Low gelegt
+ *  und bleibt unter dem letzten Hardstopp, bis die Position geschlossen wird
+ */
+  
+namespace AgenaTrader.UserCode
+{
+    public class ResultValue_StopBarByBar
+    {
+        public bool ErrorOccured = false;
+        public OrderAction? Entry = null;
+        public OrderAction? Exit = null;
+        public double Price = 0.0;
+        public double Slow = 0.0;
+        public double Fast = 0.0;
+        public double H_Stopp = 0.0;
+        
+        public int Profit = 0;
+        public int Abstand = 2;
+        public int Toleranz = 2;
+        public double S_Stopp = 0.0;
+    }
+
+    [Description("Bewegungsstopp Bar by Bar")]
+    public class StopBarByBar : UserIndicator
+    {
+        #region Variables
+        // private int _trend = 2;
+        private double Stopp = 0.0;
+        private int _abstand = 2;
+        private int _toleranz = 2;
+        private bool HardStopp_aktiv = false;
+        private int _profit = 2;
+        private double Gewinn = 0.00;
+
+        //input PlotColor
+        private Color _plot0color = Color.Blue;
+        private int _plot0width = 2;
+        private DashStyle _plot0dashstyle = DashStyle.DashDotDot;
+        private Color _plot1color = Color.Red;
+        private int _plot1width = 2;
+        private DashStyle _plot1dashstyle = DashStyle.Solid;
+
+        private bool _IsLongEnabled = true;
+        private bool _IsShortEnabled = true;
+        private int _fastsma = 20;
+        private int _slowsma = 50;
+
+        #endregion Variables
+
+        protected override void OnInit()
+        {
+            if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);
+            CalculateOnClosedBar = true;
+            RequiredBarsCount = 2;
+            Abstand = _abstand;
+            IsOverlay = true;
+            //Define the plots and its color which is displayed underneath the chart
+            Add(new Plot(this.Plot0Color, "Soft-Stopp"));
+            Add(new Plot(this.Plot1Color, "Hard-Stopp"));
+
+
+        }
+
+        protected override void OnStart()
+        {
+            if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);
+
+        }
+        protected override void OnCalculate()
+        {
+            if (!DatafeedPeriodicityIsValid(Bars.TimeFrame))
+            {
+                Log(this.DisplayName + ": Bitte richtigen Timeframe auf zeitbasiert einstellen", InfoLogLevel.AlertLog);
+                return;
+            }
+            //Print("Abstand: "+ _abstand);
+            //Lets call the calculate method and save the result with the trade action
+            //ResultValue_StopBarByBar returnvalue = this.calculate(this.InSeries, this.FastSma, this.SlowSma, this.IsLongEnabled, this.IsShortEnabled);
+            //ResultValue_StopBarByBar returnvalue = this.calculate(this.InSeries, this.RequiredBarsCount, this.Abstand, this.Toleranz);
+            ResultValue_StopBarByBar returnvalue = this.calculate(this.InSeries, this.Abstand, this.Toleranz);
+            //If the calculate method was not finished we need to stop and show an alert message to the user.
+            if (returnvalue.ErrorOccured)
+            {
+                Log(this.DisplayName + ": A problem has occured during the calculation method!", InfoLogLevel.AlertLog);
+                return;
+            }
+            if (TradeInfo == null || (TradeInfo.CreatedDateTime) >= Time[0]) return;  // Indikator bis Beginn des Trades nachzeichnen
+                                                                                      //Set the curve data for the chart drawing
+
+            //this.Indicator_Curve_Fast.Set(returnvalue.H_Stopp);
+            this.Indicator_Curve_Slow.Set(SoftStopp[0]);
+            this.Indicator_Curve_Fast.Set(returnvalue.H_Stopp);
+
+
+
+            if (TradeInfo != null && TradeInfo.Quantity != 0)                         // solange der Trade läuft
+            {
+                Gewinn = ((SoftStopp[1] - TradeInfo.AvgPrice) / TradeInfo.AvgPrice * 1000);
+
+                if (InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, Toleranz).IsInsideBar[0] == 1.0)
+                {
+                    Stopp = Instrument.Round2TickSize(InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, Toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
+                    if (HardStopp_aktiv && HardStopp[1] > Stopp && Gewinn > _profit)
+                        HardStopp[1] = Stopp;
+                    else
+                        HardStopp[1] = HardStopp[2];
+                }
+                else
+                {
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (Low[0] - _abstand * TickSize)));
+                }
+                SoftStopp[0] = Stopp;
+                if (!HardStopp_aktiv && Gewinn > _profit && InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, Toleranz).IsInsideBar[0] < 1.0)    // Hardstopp erstmalig setzen
+                {
+                    HardStopp[0] = SoftStopp[0];
+                    HardStopp_aktiv = true;
+                }
+                else if (HardStopp_aktiv && Close[1] < SoftStopp[1] && HardStopp[1] < SoftStopp[1])    // Hardstop nachziehen wenn alter Hardstopp kleiner
+                {
+                    HardStopp[0] = SoftStopp[1];
+                }
+                else if (HardStopp[1] > 0)      // Hardstopp beigehalten
+                {
+                    HardStopp[0] = HardStopp[1];
+                }
+                if (SoftStopp[1] > 0)
+                    AddChartTextFixed("MyText",
+                    "Soft-Risk:  " + ((SoftStopp[1] - TradeInfo.AvgPrice) * TradeInfo.Quantity).ToString("F2") + " € ",
+                    TextPosition.BottomLeft, Color.Blue, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+
+                if (HardStopp[1] > 0)
+                    AddChartTextFixed("MyText1",
+                    "Hard-Risk: " + ((HardStopp[1] - TradeInfo.AvgPrice) * TradeInfo.Quantity).ToString("F2") + " € ",
+                    TextPosition.BottomLeft, Color.Blue, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+
+ 
+            }
+
+            else    // Trade ist geschlossen
+            {
+                if (TradeInfo != null && TradeInfo.Quantity == 0)
+                {
+                    SoftStopp.Reset();
+                    HardStopp.Reset();
+                }
+                //Print();
+            }
+            //Set the drawing style, if the user has changed it.
+            PlotColors[0][0] = this.Plot0Color;
+            Plots[0].PenStyle = this.Dash0Style;
+            Plots[0].Pen.Width = this.Plot0Width;
+            PlotColors[1][0] = this.Plot1Color;
+            Plots[1].PenStyle = this.Dash1Style;
+            Plots[1].Pen.Width = this.Plot1Width;
+        }
+        /// <summary>
+        /// In this method we do all the work and return the object with all data like the OrderActions.
+        /// This method can be called from any other script like strategies, indicators or conditions.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        //public ResultValue_StopBarByBar calculate(IDataSeries data, int Barsrequiered, int Abstand, int Toleranz)
+        public ResultValue_StopBarByBar calculate(IDataSeries data, int Abstand, int Toleranz)
+        {
+            //Create a return object
+            ResultValue_StopBarByBar returnvalue = new ResultValue_StopBarByBar();
+
+            //try catch block with all calculations
+            try
+            {
+                //Calculate SMA and set the data into the result object
+                 returnvalue.Fast = SMA(data, _fastsma)[0];
+                // returnvalue.Fast = SoftStopp[0];
+                // returnvalue.Slow = HardStopp[0];
+                returnvalue.Price = data.Last();
+                returnvalue.S_Stopp = SoftStopp[0];
+                returnvalue.H_Stopp = HardStopp[0];
+                /*
+                 * CrossAbove: We create buy (entry) signal for the long position and BuyToCover (exit) for the short position.
+                 * CrossBelow: We create sell (exit) signal for the long positon and SellShort (entry) for the short position.
+                 
+
+
+                if (CrossAbove(SMA(data, fastsma), SMA(data, slowsma), 0) == true)
+                {
+                    if (islongenabled)
+                    {
+                 //       returnvalue.Entry = OrderAction.Buy;
+                    }
+                 //   if (isshortenabled)
+                    {
+                   //     returnvalue.Exit = OrderAction.BuyToCover;
+                    }
+
+                }
+                
+                // else if (CrossBelow(SMA(data, fastsma), SMA(data, slowsma), 0) == true)
+                else if (Close[0] < HardStopp[1])
+                {
+                    
+                    if (islongenabled)
+                    {
+                        returnvalue.Exit = OrderAction.Sell;
+                    }
+                    if (isshortenabled)
+                    {
+                        returnvalue.Entry = OrderAction.SellShort;
+                    }
+                }
+                */
+            }
+            catch (Exception)
+            {
+                //If this method is called via a strategy or a condition we need to log the error.
+                returnvalue.ErrorOccured = true;
+            }
+
+            //return the result object
+            return returnvalue;
+        }
+        /// <summary>
+        /// defines display name of indicator (e.g. in AgenaTrader chart window)
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return "BarbyBar_Stop (I)";
+        }
+
+        /// <summary>
+        /// defines display name of indicator (e.g. in AgenaTrader indicator selection window)
+        /// </summary>
+        public override string DisplayName
+        {
+            get
+            {
+                return "BarbyBar_Stop (I)";
+            }
+        }
+
+
+        /// <summary>
+        /// True if the periodicity of the data feed is correct for this indicator.
+        /// </summary>
+        /// <returns></returns>
+        public bool DatafeedPeriodicityIsValid(ITimeFrame timeframe)
+        {
+            TimeFrame tf = (TimeFrame)timeframe;
+            if (tf.Periodicity == DatafeedHistoryPeriodicity.Week || tf.Periodicity == DatafeedHistoryPeriodicity.Day || tf.Periodicity == DatafeedHistoryPeriodicity.Hour || tf.Periodicity == DatafeedHistoryPeriodicity.Minute)
+            {
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+
+        #region Properties
+
+        [Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries SoftStopp
+		{
+			get { return Outputs[0]; }   // Datenserie 0
+		}
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries HardStopp
+		{
+			get { return Outputs[1]; }   // Datenserie 1
+        }
+        /*
+                [Description("Trend-Grösse")]
+                [Category("Parameters")]
+                public int Trend
+                {
+                    get { return _trend; }
+                    set { _trend = Math.Max(1, value); }
+                }
+                */
+        /*
+                [Description("Profit only")]
+                        [Category("Parameters")]
+                        public bool ProfitOnly
+                        {
+                            get { return _profitOnly; }
+                            set { _profitOnly = value; }
+                        }
+        */
+
+
+        /// <summary>
+        /// </summary>
+        [Description("The period of the fast SMA indicator.")]
+        [Category("Parameters")]
+        [DisplayName("Period fast")]
+        public int FastSma
+        {
+            get { return _fastsma; }
+            set { _fastsma = value; }
+        }
+
+
+
+        /// <summary>
+        /// </summary>
+        [Description("The period of the slow SMA indicator.")]
+        [Category("Parameters")]
+        [DisplayName("Period slow")]
+        public int SlowSma
+        {
+            get { return _slowsma; }
+            set { _slowsma = value; }
+        }
+
+    
+    
+        /// <summary>
+        /// </summary>
+        [Description("If true it is allowed to create long positions.")]
+        [Category("Parameters")]
+        [DisplayName("Allow Long")]
+        public bool IsLongEnabled
+        {
+            get { return _IsLongEnabled; }
+            set { _IsLongEnabled = value; }
+        }
+
+
+        /// <summary>
+        /// </summary>
+        [Description("If true it is allowed to create short positions.")]
+        [Category("Parameters")]
+        [DisplayName("Allow Short")]
+        public bool IsShortEnabled
+        {
+            get { return _IsShortEnabled; }
+            set { _IsShortEnabled = value; }
+        }
+
+
+
+        [Description("Mindest-Gewinn in Promille")]
+        [Category("Parameters")]
+        public int Profit
+        {
+            get { return _profit; }
+            set { _profit = value; }
+        }
+        [Description("Tick-Abstand")]
+        [Category("Parameters")]
+        public int Abstand
+        {
+            get { return _abstand; }
+            set { _abstand = Math.Max(0, value); }
+        }
+
+        [Description("Tick-Abstand")]
+        [Category("Parameters")]
+        public int Toleranz
+        {
+            get { return _toleranz; }
+            set { _toleranz = Math.Max(0, value); }
+        }
+
+
+        /// <summary>
+        /// </summary>
+        [Description("Wähle Farbe für Soft-Stopp")]
+        [Category("Plots")]
+        [DisplayName("Farbe Soft-Stopp")]
+        public Color Plot0Color
+        {
+            get { return _plot0color; }
+            set { _plot0color = value; }
+        }
+        // Serialize Color object
+        [Browsable(false)]
+        public string Plot0ColorSerialize
+        {
+            get { return SerializableColor.ToString(_plot0color); }
+            set { _plot0color = SerializableColor.FromString(value); }
+        }
+
+        /// <summary>
+        /// </summary>
+        [Description("Strickstärke für Soft-Stopp")]
+        [Category("Plots")]
+        [DisplayName("Linienbreit Soft-Stopp")]
+        public int Plot0Width
+        {
+            get { return _plot0width; }
+            set { _plot0width = Math.Max(1, value); }
+        }
+
+        /// <summary>
+        /// </summary>
+        [Description("DashStyle Soft-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("DashStyle Soft-Stopp")]
+        public DashStyle Dash0Style
+        {
+            get { return _plot0dashstyle; }
+            set { _plot0dashstyle = value; }
+        }
+
+
+        /// <summary>
+        /// </summary>
+        [Description("Wähle Farbe für Hard-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("Color Hard-Stopp")]
+        public Color Plot1Color
+        {
+            get { return _plot1color; }
+            set { _plot1color = value; }
+        }
+        // Serialize Color object
+        [Browsable(false)]
+        public string Plot1ColorSerialize
+        {
+            get { return SerializableColor.ToString(_plot1color); }
+            set { _plot1color = SerializableColor.FromString(value); }
+        }
+
+        /// <summary>
+        /// </summary>
+        [Description("Linienbreite für Hard-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("Linienbreite für Hard-Stopp")]
+        public int Plot1Width
+        {
+            get { return _plot1width; }
+            set { _plot1width = Math.Max(1, value); }
+        }
+
+        /// <summary>
+        /// </summary>
+        [Description("DashStyle für Hard-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("DashStyle Hard-Stopp")]
+        public DashStyle Dash1Style
+        {
+            get { return _plot1dashstyle; }
+            set { _plot1dashstyle = value; }
+        }
+
+
+
+        #region Output Datenserie für Plot
+
+        [Browsable(false)]
+        [XmlIgnore()]
+        public DataSeries Indicator_Curve_Fast
+        {
+            get { return Outputs[0]; }
+        }
+
+        [Browsable(false)]
+        [XmlIgnore()]
+        public DataSeries Indicator_Curve_Slow
+        {
+            get { return Outputs[1]; }
+        }
+
+        #endregion
+
+
+
+
+        #endregion
+    }
+}
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator
+	{
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+        {
+			return StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<StopBarByBar>(input, i => i.FastSma == fastSma && i.SlowSma == slowSma && i.IsLongEnabled == isLongEnabled && i.IsShortEnabled == isShortEnabled && i.Profit == profit && i.Abstand == abstand && i.Toleranz == toleranz);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new StopBarByBar
+						{
+							RequiredBarsCount = RequiredBarsCount,
+							CalculateOnClosedBar = CalculateOnClosedBar,
+							InSeries = input,
+							FastSma = fastSma,
+							SlowSma = slowSma,
+							IsLongEnabled = isLongEnabled,
+							IsShortEnabled = isShortEnabled,
+							Profit = profit,
+							Abstand = abstand,
+							Toleranz = toleranz
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			if (IsInInit && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
+
+			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+
+		/// <summary>
+		/// Bewegungsstopp Bar by Bar
+		/// </summary>
+		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
+		{
+			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion

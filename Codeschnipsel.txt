@@ -1,0 +1,10 @@
+Log("Das ist eine Warnung.", InfoLogLevel.Warning);  // gelb Warnung in Protokoll
+siehe Script Suche  "LOG"
+
+http://www.tradeescort.com/phpbb_de/viewtopic.php?f=109&t=2425&p=10588&hilit=GetScriptedCondition#p10588
+Zugriff aus Strategie auf scripted Condition:
+public virtual AgenaTrader.API.ScriptedConditionBase GetScriptedCondition(string scName, AgenaTrader.Plugins.IDataSeries input)
+
+Array als auswahlliste siehe 
+http://www.tradeescort.com/phpbb_de/viewtopic.php?f=20&t=2316
+ForceIndex.cs

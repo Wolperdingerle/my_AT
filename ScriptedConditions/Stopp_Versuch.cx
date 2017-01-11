@@ -1,0 +1,233 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+	[Description("Versuch einer Stopp-Programmierung")]
+	[IsEntryAttribute(true)]
+	[IsStopAttribute(false)]
+	[IsTargetAttribute(false)]
+	[OverrulePreviousStopPrice(true)]
+	public class Stopp_Versuch : UserScriptedCondition
+	{
+		#region Variables
+
+		private int _abstand = 1;
+		private int _toleranz = 1;
+		private int _profit = 1;
+        private double Stopp = 0;
+
+		#endregion
+
+		protected override void OnInit()
+		{
+			IsEntry = false;
+			IsStop = true;
+			IsTarget = false;
+			Add(new Plot(Color.FromArgb(255, 255, 0, 102), "Occurred"));
+			Add(new Plot(Color.FromArgb(255, 74, 101, 25), "Entry"));
+			IsOverlay = true;
+			CalculateOnClosedBar = true;
+		}
+
+		protected override void OnCalculate()
+		{
+            //TODO: Write your owner OnBarUpdate handling
+            if (InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] == 1.0)
+            {
+                Stopp = Instrument.Round2TickSize(InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, _toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
+            }
+            else
+            { 
+                Stopp = Instrument.Round2TickSize(Math.Max(Stopp, Low[1] - _abstand * TickSize));
+            }
+            Entry.Set(Stopp);
+            if (Close[0] < Stopp)
+            {
+                Occurred.Set(-1);
+            }
+            else
+            {
+                Occurred.Set(0);
+            }
+
+        }
+
+		#region Properties
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Occurred
+		{
+			get { return Outputs[0]; }
+		}
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Entry
+		{
+			get { return Outputs[1]; }
+		}
+
+		public override IList<DataSeries> GetEntries()
+		{
+			return new[]{Entry};
+		}
+
+		[Description("")]
+		[Category("Parameters")]
+		public int Abstand
+		{
+			get { return _abstand; }
+			set { _abstand = Math.Max(1, value); }
+		}
+
+		[Description("")]
+		[Category("Parameters")]
+		public int Toleranz
+		{
+			get { return _toleranz; }
+			set { _toleranz = Math.Max(1, value); }
+		}
+
+		[Description("")]
+		[Category("Parameters")]
+		public int Profit
+		{
+			get { return _profit; }
+			set { _profit = Math.Max(1, value); }
+		}
+
+		#endregion
+	}
+}
+#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
+
+namespace AgenaTrader.UserCode
+{
+	#region Indicator
+
+	public partial class UserIndicator
+	{
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+        {
+			return Stopp_Versuch(InSeries, abstand, toleranz, profit);
+		}
+
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(IDataSeries input, System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			var indicator = CachedCalculationUnits.GetCachedIndicator<Stopp_Versuch>(input, i => i.Abstand == abstand && i.Toleranz == toleranz && i.Profit == profit);
+
+			if (indicator != null)
+				return indicator;
+
+			indicator = new Stopp_Versuch
+						{
+							RequiredBarsCount = RequiredBarsCount,
+							CalculateOnClosedBar = CalculateOnClosedBar,
+							InSeries = input,
+							Abstand = abstand,
+							Toleranz = toleranz,
+							Profit = profit
+						};
+			indicator.SetUp();
+
+			CachedCalculationUnits.AddIndicator2Cache(indicator);
+
+			return indicator;
+		}
+	}
+
+	#endregion
+
+	#region Strategy
+
+	public partial class UserStrategy
+	{
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			return LeadIndicator.Stopp_Versuch(InSeries, abstand, toleranz, profit);
+		}
+
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(IDataSeries input, System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			if (IsInInit && input == null)
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
+
+			return LeadIndicator.Stopp_Versuch(input, abstand, toleranz, profit);
+		}
+	}
+
+	#endregion
+
+	#region Column
+
+	public partial class UserColumn
+	{
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			return LeadIndicator.Stopp_Versuch(InSeries, abstand, toleranz, profit);
+		}
+
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(IDataSeries input, System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			return LeadIndicator.Stopp_Versuch(input, abstand, toleranz, profit);
+		}
+	}
+
+	#endregion
+
+	#region Scripted Condition
+
+	public partial class UserScriptedCondition
+	{
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			return LeadIndicator.Stopp_Versuch(InSeries, abstand, toleranz, profit);
+		}
+
+		/// <summary>
+		/// Versuch einer Stopp-Programmierung
+		/// </summary>
+		public Stopp_Versuch Stopp_Versuch(IDataSeries input, System.Int32 abstand, System.Int32 toleranz, System.Int32 profit)
+		{
+			return LeadIndicator.Stopp_Versuch(input, abstand, toleranz, profit);
+		}
+	}
+
+	#endregion
+
+}
+
+#endregion
