@@ -42,7 +42,6 @@ namespace AgenaTrader.UserCode
            // SoftStopp = High[0];
            // HardStopp = Low[0];
             Soft_Stopp.Set(SoftStopp);
-            // was geändert, test
 			Hard_Stopp.Set(HardStopp);
 		}
        
@@ -134,7 +133,7 @@ namespace AgenaTrader.UserCode
 		public Test2Plot Test2Plot(IDataSeries input)
 		{
 			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
+				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
 
 			return LeadIndicator.Test2Plot(input);
 		}
