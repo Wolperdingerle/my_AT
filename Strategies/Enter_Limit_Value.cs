@@ -13,19 +13,17 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-    [Description("Limit-Vorschlags-Enter-Order mit festgelegtem Kapital und Einstiegspreis, die Stückzahl wird automatisch ermittelt und aufgerundet.")]
+    [Description("Limit-Vorschlags-Enter-Order mit festgelegtem Kapital und Einstiegspreis, die Stückzahl wird automatisch ermittelt und aufgerundet. Der Einstiegspreis kann im Chart auch nach der Aktievierung verschoben werden. Die Stückzahl wird auch dann noch angepasst.")]
     public class Enter_Limit_Value : UserStrategy
     {
         #region Variables
 
-        private int _kapital = 5000;
+        private double _kapital = 5000;
         private string MyText = null;
         private IOrder EnterOrder = null;
         private string orderName = "man Limit";
         private bool _sendMail = true;
         private bool _automatisch = false;
-        private double Wert = 0;
-        private int quantity = 0;
         private double LimitPreis = 0;
 
         #endregion
@@ -33,18 +31,15 @@ namespace AgenaTrader.UserCode
         protected override void OnInit()
         {
             CalculateOnClosedBar = false;
-            RequiredBarsCount = 20;
+            RequiredBarsCount = 2;
             IsAutomated = _automatisch;
-
         }
         protected override void OnStart()
         {
 
             // Limit-Order vorhanden??
             if (Chart != null) AddChartTextFixed("MyText", "Limit-Kauf für ca. " + _kapital.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-            //if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);
-            Wert = _kapital;
-            if (Orders.Count > 0)
+            if (Orders.Count > 0 && EnterOrder == null)
             {
                 int i = 0;
                 do
@@ -52,7 +47,7 @@ namespace AgenaTrader.UserCode
                     if (Orders[i].Action == OrderAction.Buy && Orders[i].OrderState != OrderState.Filled && Orders[i].OrderType == OrderType.Limit)
                     {
                         EnterOrder = Orders[i];
-                        Wert = EnterOrder.Quantity * EnterOrder.LimitPrice;
+                       // _kapital = EnterOrder.Quantity * EnterOrder.LimitPrice;
                     }
                     ++i;
                 } while (i < Orders.Count);
@@ -75,35 +70,25 @@ namespace AgenaTrader.UserCode
 
         protected override void OnOrderChanged( IOrder Order)
         {
-            if (Order.Action == OrderAction.Buy)
+            if (Order.Action == OrderAction.Buy && Order.OrderState != OrderState.PendingReplace && Order.OrderState != OrderState.PartFilled && Order.OrderState != OrderState.PendingSubmit)
             {
-                
-                ReplaceOrder(Order, (int)(quantity/ Order.LimitPrice), Order.LimitPrice, Order.StopPrice);
+                if(Order.LimitPrice > 0 && Order.Quantity != (int)(_kapital / Order.LimitPrice) + 1)
+                ReplaceOrder(Order, (int)(_kapital/ Order.LimitPrice)+1, Instrument.Round2TickSize(Order.LimitPrice), 0);
+                if (Chart != null) AddChartTextFixed("MyText", "Limit-Kauf für ca. " + (EnterOrder.Quantity * EnterOrder.LimitPrice).ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
+
             }
 
-                
+
         }
 
 
         protected override void OnCalculate()
         {
-          /*  if (Chart != null)
-            {
-                if (EnterOrder == null)
-                    AddChartTextFixed("MyText", "Limit-Kauf für ca. " + _kapital.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                else if (EnterOrder != null && EnterOrder.OrderState == OrderState.Cancelled)
-                    AddChartTextFixed("MyText", "Order abgebrochen ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                else if (EnterOrder != null && EnterOrder.OrderState == OrderState.Filled)
-                    AddChartTextFixed("MyText", "Kauf ausgeführt ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                else
-                    AddChartTextFixed("MyText", "Limit-Kauf für ca. " + Wert.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-            }
-            */
-            if ((Trade != null && Trade.Quantity * Trade.AvgPrice >= _kapital * 0.95) || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled)))
-                return;
-            if (!IsProcessingBarIndexLast) return;
 
-            if (Wert > 2 * Account.CashValue)    // = freises Kapital;
+            if (!IsProcessingBarIndexLast || (Trade != null && Trade.Quantity * Trade.AvgPrice >= _kapital * 0.95) || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled)))
+                return;
+            
+            if (_kapital > 2 * Account.CashValue)    // = freises Kapital;
             {
                 Log(this.Instrument.Name + ": kein ausreichendes, freies Kabital vorhanden!", InfoLogLevel.AlertLog);
                 return;
@@ -112,47 +97,24 @@ namespace AgenaTrader.UserCode
             if (EnterOrder == null)
             {
                 LimitPreis = Instrument.Round2TickSize(Close[0] *0.985); // Limitpries 1,5% unter letztem Kurs
-                quantity = (int)((_kapital / LimitPreis) + 1);
-                EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.Limit, quantity, LimitPreis, 0, "", orderName);
-                Wert = EnterOrder.Quantity * EnterOrder.LimitPrice;
-                
+                EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.Limit, (int)((_kapital / LimitPreis) + 1), LimitPreis, 0, orderName, orderName);
             }
             else
+                if (EnterOrder.OrderState == OrderState.Filled) return;
+            
+            if (EnterOrder != null && EnterOrder.OrderState == OrderState.Cancelled)
             {
-
-                if (EnterOrder.OrderState == OrderState.Filled)
-                {
-                    return;
-                }
-                if(EnterOrder != null && EnterOrder.OrderState != OrderState.Filled && EnterOrder.OrderState != OrderState.PendingReplace && EnterOrder.OrderState != OrderState.PendingSubmit) 
-                {
-                    // Neuberechnung Quantity
-                    if(EnterOrder.Quantity != (int)(((_kapital / EnterOrder.LimitPrice) + 1)))
-                    {
-                    // Neuberechnung der Stückzahl mit aktuellem Preis
-                    quantity = (int)((_kapital / EnterOrder.LimitPrice) + 1);
-                    ReplaceOrder(EnterOrder, quantity, EnterOrder.LimitPrice, 0);
-                    Wert = EnterOrder.Quantity * EnterOrder.LimitPrice;
-                    if (Chart != null) AddChartTextFixed("MyText", "Limit-Kauf für ca. " + Wert.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                    }
-                }
-            }
-            if (EnterOrder.OrderState == OrderState.Cancelled)
-            {
-                //EnterOrder = null;
+                EnterOrder = null;
                 if (Chart != null) AddChartTextFixed("MyText", "Order gelöscht", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
             }
         }
-
-            
-
-
+        
 
         #region Properties
 
         [Description("Kapital für diese Order")]
 		[Category("Parameters")]
-		public int Kapital
+		public double Kapital
 		{
 			get { return _kapital; }
 			set { _kapital = Math.Max(4000, value); }
