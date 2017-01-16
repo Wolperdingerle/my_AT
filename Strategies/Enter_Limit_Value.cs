@@ -70,7 +70,8 @@ namespace AgenaTrader.UserCode
 
         protected override void OnOrderChanged( IOrder Order)
         {
-            if (Order.Action == OrderAction.Buy && Order.OrderState != OrderState.PendingReplace && Order.OrderState != OrderState.PartFilled && Order.OrderState != OrderState.PendingSubmit)
+            if (Order.Action == OrderAction.Buy && Order.OrderState != OrderState.PendingReplace && Order.OrderState != OrderState.PartFilled && Order.OrderState != OrderState.PendingSubmit
+                && Order.OrderState != OrderState.PendingCancel && Order.OrderState != OrderState.Filled)
             {
                 if(Order.LimitPrice > 0 && Order.Quantity != (int)(_kapital / Order.LimitPrice) + 1)
                 ReplaceOrder(Order, (int)(_kapital/ Order.LimitPrice)+1, Instrument.Round2TickSize(Order.LimitPrice), 0);
@@ -85,7 +86,7 @@ namespace AgenaTrader.UserCode
         protected override void OnCalculate()
         {
 
-            if (!IsProcessingBarIndexLast || (Trade != null && Trade.Quantity * Trade.AvgPrice >= _kapital * 0.95) || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled)))
+            if (!IsProcessingBarIndexLast || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled)))
                 return;
             
             if (_kapital > 2 * Account.CashValue)    // = freises Kapital;
