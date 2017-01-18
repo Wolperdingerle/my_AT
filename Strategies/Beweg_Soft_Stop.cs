@@ -43,8 +43,7 @@ namespace AgenaTrader.UserCode
         private bool _sendMail = false;         // Email nach Ausführung zusenden
         private string BStopp = "Bewegungs-Soft-Stopp";
         private bool _stopLimit = true;         // Stopp-Order als Stopp-Limit-Order
-        private double delta = 1;                  // Differenz zwischen Stopp- ind Limit-Preis bei Stopp-Limit-Order in Promille vom Stopp-Preis
-        private double Limit = 0.0;             // LimitPreis aus delta und Low berechnet
+        private double Limit = 0.0;             // LimitPreis ist die Hälfte aus Stopp und Einstiegspreis berechnet
         private bool _softstopp = true;         // Stopp als Softstopp Bar by Bar
         private int _toleranz = 2;              // Toleranz in Tick bei InsideBars
     //    private Test2Plot _Test2Plot = null;
@@ -168,7 +167,7 @@ namespace AgenaTrader.UserCode
                     {
                         if ((!_profitOnly || (_profitOnly && (Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)))))    // neuer Stopp auch im Gewinn
                         {
-                            Limit = Instrument.Round2TickSize((1 - delta / 1000) * Stopp);
+                            Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice)/2 + Trade.AvgPrice);
                             ReplaceOrder(oStop, Stueck, Limit, Stopp);
                           //  Print("Stop-Preis: " + oStop.StopPrice + " Limit: " + oStop.LimitPrice);
                         }
@@ -195,7 +194,7 @@ namespace AgenaTrader.UserCode
                     if (_softstopp)
                     {
                         Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
-                        Limit = Instrument.Round2TickSize((1 - delta / 1000) * Stopp);
+                        Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
                     }
                     if (_stopLimit)
                         oStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
@@ -212,11 +211,9 @@ namespace AgenaTrader.UserCode
                     if ( oStop.OrderState != OrderState.Filled && oStop.OrderState != OrderState.PendingSubmit &&
                          oStop.OrderState != OrderState.PendingReplace && oStop.OrderState != OrderState.PartFilled)
                     {
-                        Limit = Instrument.Round2TickSize(Math.Max(oStop.LimitPrice, (Low[0] - Trade.AvgPrice) / 2 + Trade.AvgPrice));
-                        //ReplaceOrder(oStop, Stueck, Math.Max(oStop.StopPrice, (Low[0] - (_abstand + (int)(delta * Close[1] / 1000)) * TickSize)), Stopp - _abstand * TickSize);
+                        Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
                         ReplaceOrder(oStop, Stueck, Limit, 
                                      Instrument.Round2TickSize(Math.Max(oStop.StopPrice, (Low[0] - _abstand * TickSize))));
-                        //Print("c");
                     }
                 }
                 #endregion Hardstopp_Berechnung
