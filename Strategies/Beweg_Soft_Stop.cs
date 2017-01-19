@@ -35,7 +35,7 @@ namespace AgenaTrader.UserCode
         private int _abstand = 2;               // Abstand in Ticks vom Low
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Prifit im Promille aktvieren
-        private int _teilverkauf = 0;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
+        private int _teilverkauf = 2;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
         private IOrder oStop = null;
         private double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
