@@ -12,7 +12,8 @@ using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
 
 /// <summary>
-/// Bewegungs-Softstopp nach Markttechnik
+/// Bewegungs-Softstopp nach Markttechnik für die halbe Position
+/// für den Rest Trendstop am P3, Trendstärke einstellbar.
 /// einstellbare Besonderheiten: 
 /// Hardstopp (Stop-Order beim Broker) wird erst gesetzt wenn ein einstellbarer Gewinn in Promille zum Stopp aufgelaufen ist (ProfitOnly, Profit)
 /// Abstand vom Low/High des letzten Bars 
@@ -26,9 +27,9 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-	[Description("Bewegungsstopp als Softstopp mit einstellbarem Volumen")]
+	[Description("Bewegungs und Trendstopp als Softstopp mit einstellbarem Volumen")]
    
-    public class Beweg_Soft_Stop : UserStrategy
+    public class BT_Soft_Stop : UserStrategy
 	{
         #region Variables
        
@@ -36,11 +37,12 @@ namespace AgenaTrader.UserCode
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Prifit im Promille aktvieren
         private int _teilverkauf = 2;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
-        private IOrder oStop = null;
+        private IOrder oStop = null;            // Bewegungs-Stopp-Order
+        private IOrder oTStop = null;           // Trend-Stopp-Order
         private double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
-        private double _profit = 6;             // Mindestprofit in Promille
-        private bool _sendMail = true;         // Email nach Ausführung zusenden
+        private double _profit = 5;             // Mindestprofit in Promille
+        private bool _sendMail = false;         // Email nach Ausführung zusenden
         private string BStopp = "Bewegungs-Soft-Stopp";
         private bool _stopLimit = true;         // Stopp-Order als Stopp-Limit-Order
         private double Limit = 0.0;             // LimitPreis ist die Hälfte aus Stopp und Einstiegspreis berechnet
@@ -76,7 +78,7 @@ namespace AgenaTrader.UserCode
                 {
                     if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
                          execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt.",
-                         execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt. Profit:" + (Trade.ClosedProfitLoss - execution.Commission).ToString("F2"));
+                         execution.Instrument.Symbol + "Bewegungs-Stop-Order " + execution.Name + " ausgeführt. Profit:" + (Trade.ClosedProfitLoss - execution.Commission).ToString("F2"));
                     
                 }
             }
