@@ -157,6 +157,9 @@ namespace AgenaTrader.UserCode
                 if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);    // Tick-Abstand
 
                 #region Stopp_Berechnung
+                // Stopp-Berechnung beginnt erst nach dem Bar, der auf den Entry-Bar beginnt.
+                if (Position.CreatedDateTime > Time[1])
+                    return;
                 // Stopp-Berechnung: bei InsideBar zurück auf Aussenstab, sonst BarByBar
 
                 if (InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] > 0)
@@ -224,7 +227,7 @@ namespace AgenaTrader.UserCode
                 Print(Instrument.Symbol + " Bar: " + ProcessingBarIndex + " Stueck: " + Stueck + " Stop-Preis: " + oStop.Price + " Limit:" + oStop.LimitPrice);
 
                 if (Chart != null)
-                    AddChartTextFixed("MyText", "Bewegunsstopp für " + Stueck.ToString("F0") + " Stück  Soft-Stopp: " + Stopp.ToString("F2") +
+                    AddChartTextFixed("MyText", "Bewegunsstopp für " + oStop.Quantity.ToString("F0") + " Stück  Soft-Stopp: " + Stopp.ToString("F2") +
                     " = " +((Stopp - Trade.AvgPrice)*Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
             }
                 

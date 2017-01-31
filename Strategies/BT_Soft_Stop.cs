@@ -14,6 +14,8 @@ using AgenaTrader.Helper;
 /// <summary>
 /// Bewegungs-Softstopp nach Markttechnik für die halbe Position
 /// für den Rest Trendstop am P3, Trendstärke einstellbar.
+/// 1. Hardstopp immer für die gesamte Position, wenn Profit überschritten wird.
+/// Wird der 1. Hardstopp nachgezogen, dann nur für fie halbe Position
 /// einstellbare Besonderheiten: 
 /// Hardstopp (Stop-Order beim Broker) wird erst gesetzt wenn ein einstellbarer Gewinn in Promille zum Stopp aufgelaufen ist (ProfitOnly, Profit)
 /// Abstand vom Low/High des letzten Bars 
