@@ -28,11 +28,12 @@ namespace AgenaTrader.UserCode
         private bool _automatisch = true;
         private bool _sendMail = true;
         private IOrder EnterOrder = null;
+        private IOrder LimitOrder = null;
         private string orderName = "Vol_Peek_Stp";
         private double Wert = 0;
         private int quantity = 0;
         private double StopPreis = 0;
-        private int _barBack = 2;        // BarBack = 1 = letzter Bar, Bar[0] = laufender bar, nicht abgeschlossen
+        private int _barBack = 1;        // BarBack = 1 = letzter Bar, Bar[0] = laufender bar, nicht abgeschlossen
         private bool _stopLimit = false;
 
 
@@ -40,12 +41,12 @@ namespace AgenaTrader.UserCode
 
         protected override void OnInit()
 		{
-			CalculateOnClosedBar = false;
-            RequiredBarsCount = 1000;
+			CalculateOnClosedBar = true;
             Kapital = _kapital;
             IsAutomated = _automatisch;
             BarBack = _barBack;
             StopLimit = _stopLimit;
+            RequiredBarsCount = _barBack +1;
         }
 
         protected override void OnStart()
@@ -55,6 +56,29 @@ namespace AgenaTrader.UserCode
             if (Chart != null) AddChartTextFixed("MyText", "Stop-Limit-Kauf für ca. " + _kapital.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
             if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);
             Wert = _kapital;
+         }
+
+        protected override void OnOrderExecution(IExecution execution)
+        {
+
+            if (execution.Order != null && execution.Order.OrderState == OrderState.Filled)
+            {
+                if (EnterOrder != null && execution.Order.OrderType == EnterOrder.OrderType)
+                {
+                    if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
+                         execution.Instrument.Symbol + " Kauf-Order " + execution.Name + " ausgeführt.",
+                         execution.Instrument.Symbol + " Kauf-Order " + execution.Name +" mit " + execution.Quantity + " Stück ausgeführt. Ausführungspreis: " + (execution.Price).ToString("F2"));
+                    if (LimitOrder != null) LimitOrder.CancelOrder();
+                }
+                if(LimitOrder != null && execution.Order.OrderType == LimitOrder.OrderType) if (EnterOrder != null) EnterOrder.CancelOrder();
+            }
+        }
+
+        protected override void OnCalculate()
+		{
+            if (!IsProcessingBarIndexLast 
+                || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled))) return;
+            
             if (Orders.Count > 0)   // suche nach vorhandener Stop-Limit-Order
             {
                 int i = 0;
@@ -62,49 +86,22 @@ namespace AgenaTrader.UserCode
                 {
                     if (Orders[i].Action == OrderAction.Buy && Orders[i].OrderState != OrderState.Filled)
                     {
-                        EnterOrder = Orders[i];
-                        StopPreis  = Orders[i].StopPrice;
-                        Wert = EnterOrder.Quantity * EnterOrder.StopPrice;
+                        if (_stopLimit && Orders[i].OrderType == OrderType.StopLimit)
+                            EnterOrder = Orders[i];
+                        else if (!_stopLimit && Orders[i].OrderType == OrderType.Stop)
+                            EnterOrder = Orders[i];
+                        else
+                            LimitOrder = Orders[i]; // da liegt zusätzlich eine Limit-Buy-Order
+                        if (EnterOrder != null)
+                        { 
+                            StopPreis = EnterOrder.StopPrice;
+                            Wert = EnterOrder.Quantity * EnterOrder.StopPrice;
+                        }
                     }
                     ++i;
                 } while (i < Orders.Count);
             }
-        }
 
-        protected override void OnOrderExecution(IExecution execution)
-        {
-
-            if (execution.Order != null && execution.Order.OrderState == OrderState.Filled)
-            {
-                if (EnterOrder != null && execution.Name == EnterOrder.Name)
-                {
-                    if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
-                         execution.Instrument.Symbol + " Kauf-Order " + execution.Name + " ausgeführt.",
-                         execution.Instrument.Symbol + " Kauf-Order " + execution.Name +" mit " + execution.Quantity + " Stück ausgeführt. Ausführungspreis: " + (execution.Price).ToString("F2"));
-                }
-            }
-        }
-
-        protected override void OnCalculate()
-		{
-          /* if (Chart != null)
-            {
-                if (EnterOrder == null)
-                    AddChartTextFixed("MyText", "Stopp-Kauf für ca. " + _kapital.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-
-                else if (EnterOrder != null && EnterOrder.OrderState != OrderState.Filled)
-                    AddChartTextFixed("MyText", "Stopp-Kauf für ca. " + Wert.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                else if (Trade != null && Trade.Quantity * Trade.AvgPrice >= _kapital * 0.95)
-                    AddChartTextFixed("MyText", "Kauf ausgeführt ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                else if (EnterOrder != null && EnterOrder.OrderState == OrderState.Cancelled)
-                        AddChartTextFixed("MyText", "Order gelöscht", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-            }
-    */        
-            if (!IsProcessingBarIndexLast || (Trade != null && Trade.Quantity * Trade.AvgPrice >= _kapital * 0.95) 
-                || (EnterOrder != null && (EnterOrder.OrderState == OrderState.Cancelled || EnterOrder.OrderState == OrderState.Filled)))
-                return; 
-            if (!FirstTickOfBar) return;
-           
             if (Wert > 2 * Account.CashValue)    // = freises Kapital;
             {
                 Log(this.Instrument.Name + ": kein ausreichendes, freies Kapital vorhanden!", InfoLogLevel.AlertLog);
@@ -120,14 +117,11 @@ namespace AgenaTrader.UserCode
                     EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.Stop, quantity, 0, StopPreis, "Enter_TS", orderName);
                 Wert = EnterOrder.Quantity * EnterOrder.StopPrice;
 
+                //if (LimitOrder != null) CreateOCOGroup(new List<IOrder> {EnterOrder, LimitOrder});
+                if (_automatisch) EnterOrder.ConfirmOrder();
             }
             else
             {
-
-                if (EnterOrder.OrderState == OrderState.Filled)
-                {
-                    return;
-                }
                 if (EnterOrder != null && EnterOrder.OrderState != OrderState.Filled && EnterOrder.OrderState != OrderState.PendingReplace && EnterOrder.OrderState != OrderState.PendingSubmit)
                 {
                     // Neuberechnung Quantity und Limitpreise
@@ -151,7 +145,7 @@ namespace AgenaTrader.UserCode
 
 		#region Properties
 
-		[Description("Kabital für Einstieg")]
+		[Description("Kapital für Einstieg, min. 4.000 €")]
 		[Category("Parameters")]
 		public int Kapital
 		{
