@@ -105,6 +105,8 @@ namespace AgenaTrader.UserCode
             if (Wert > 2 * Account.CashValue)    // = freises Kapital;
             {
                 Log(this.Instrument.Name + ": kein ausreichendes, freies Kapital vorhanden!", InfoLogLevel.AlertLog);
+                if (EnterOrder != null && EnterOrder.OrderState != OrderState.PartFilled && EnterOrder.OrderState != OrderState.PendingCancel && EnterOrder.OrderState != OrderState.PendingReplace)
+                    EnterOrder.CancelOrder();
                 return;
             }
             if (EnterOrder == null)
