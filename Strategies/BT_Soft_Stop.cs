@@ -22,6 +22,7 @@ using AgenaTrader.Helper;
 /// Toleranz bei InsideBars in Ticks
 /// Teilverkauf: von der gesamte Position kann auch nur ein Teil mit dem Stopp verkauft werden. Die Mindestordergröße ist aber immer 4.000€. (Mindestprovision)
 /// Die Trendstopp-Order liegt immer unter P3 als Stopp-Order
+/// Parameter Vollkasko: beim 1. Trendstopp wird die gesamte Position geschützt.
 /// ToDo: 
 /// Graphische Darstellung im Chart fehlt noch.
 /// 
@@ -29,12 +30,12 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-	[Description("Bewegungs und Trendstopp als Softstopp mit einstellbarem Volumen")]
-   
-    public class BT_Soft_Stop : UserStrategy
-	{
-        #region Variables
+    [Description("Bewegungs und Trendstopp als Softstopp mit einstellbarem Volumen")]
 
+    public class BT_Soft_Stop : UserStrategy
+    {
+        #region Variables
+        private bool _trendStoppOnly = false;    // Schalter Bewegung +  Trend oder nur Trendstopp
         private int _trend = 2;                 // Trendgröße
         private int _abstand = 2;               // Abstand in Ticks vom Low
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
@@ -48,18 +49,20 @@ namespace AgenaTrader.UserCode
         private bool _sendMail = false;         // Email nach Ausführung zusenden
         private string BStopp = "Bewegungs-Soft-Stopp";
         private string TStopp = "Trend-Soft-Stopp";
+        private bool TotalSchutz = true;        // frühestmöglicher Schutz für Gesamtposition
         private bool _stopLimit = true;         // Stopp-Order als Stopp-Limit-Order
         private double Limit = 0.0;             // LimitPreis ist die Hälfte aus Stopp und Einstiegspreis berechnet
         private bool _softstopp = true;         // Stopp als Softstopp Bar by Bar
         private int _toleranz = 2;              // Toleranz in Tick bei InsideBars
         private bool TStopAktiv = false;        // Steuervariable Bewegungs / Trendstopp
-    //    private Test2Plot _Test2Plot = null;
+        private bool Stueck_Merker = true;
+        //    private Test2Plot _Test2Plot = null;
 
         #endregion
 
         protected override void OnInit()
-		{
-			CalculateOnClosedBar = true;
+        {
+            CalculateOnClosedBar = true;
             RequiredBarsCount = 500;
             IsAutomated = _automatisch;
             Abstand = _abstand;
@@ -70,7 +73,10 @@ namespace AgenaTrader.UserCode
         protected override void OnStart()
         {
             base.OnStart();
-       //     _Test2Plot = new Test2Plot();
+            if (_trendStoppOnly) TStopAktiv = true;
+
+
+            //     _Test2Plot = new Test2Plot();
             //Print("b");
         }
 
@@ -86,7 +92,7 @@ namespace AgenaTrader.UserCode
                     if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
                          execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt.",
                          execution.Instrument.Symbol + "Bewegungs-Stop-Order " + execution.Name + " ausgeführt. Profit:" + (Trade.ClosedProfitLoss - execution.Commission).ToString("F2"));
-                    
+
                 }
                 if (oTStop != null && execution.Name == oTStop.Name)
                 {
@@ -97,211 +103,246 @@ namespace AgenaTrader.UserCode
                 }
             }
         }
-		protected override void OnCalculate()
-		{
+        protected override void OnCalculate()
+        {
             if (IsProcessingBarIndexLast)
             {
-                if(!TStopAktiv)
-                { 
-                #region Stopp-Order filled
-                if ((TradeInfo != null && Trade.Quantity == 0 && oBStop != null ) || (oBStop != null && oBStop.OrderState == OrderState.Filled))
+                if (Trade == null || Trade != null && Trade.PositionType == PositionType.Flat)
                 {
-                    //oBStop = null;
-                   // Stopp = 0;
+                    AddChartTextFixed("MyText", " kein Trade offen ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
+                    return;
                 }
-                #endregion Stopp-Order-filled
-
                 #region vorhandene Stop- oder StopLimit-Order holen falls eine vorhanden ist und noch nicht von der Strategie verwaltet wird
-                if (oBStop == null && Orders.Count > 0)
+                if ((oBStop == null && !TStopAktiv || oTStop == null && TStopAktiv) && Orders.Count > 0)
                 {
                     int i = 0;
                     do
                     {
-                        if (Orders[i].Action == OrderAction.Sell && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
+                        if (Orders[i].Action == OrderAction.Sell && Orders[i].OrderState != OrderState.Filled && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
                         {
-                            oBStop = Orders[i];
-                            Stopp = oBStop.StopPrice;
-                            Limit = oBStop.LimitPrice;
-                            if (oBStop.OrderType == OrderType.Stop) _stopLimit = false;
+                            if (TStopAktiv) oTStop = Orders[i];
+                            else oBStop = Orders[i];
+                            Stopp = Orders[i].StopPrice;
+                            Limit = Orders[i].LimitPrice;
+                            if (Orders[i].OrderType == OrderType.Stop) _stopLimit = false;
                             else _stopLimit = true;
                         }
                         ++i;
                     } while (i < Orders.Count);
                 }
                 #endregion
-
-                #region Stueck
-                if (Trade == null || Trade != null && Trade.PositionType ==  PositionType.Flat)
-                {
-                    AddChartTextFixed("MyText", " kein Trade offen ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                    return;
-                }
-                if (Trade.Quantity * Trade.AvgPrice < 8000)     // verkaufe alles wenn unter 8.000 €
-                {
-                    Stueck = Trade.Quantity;
-                }
-                else if (Trade.Quantity * Trade.AvgPrice < 12000)   // verkaufe alles oder die Hälfte wenn 8.000 bis 12.000
-                {
-                    if (_teilverkauf > 0 )
-                        Stueck = (int)(Trade.Quantity / 2);
-                    else
-                        Stueck = Trade.Quantity;
-                }
-                else if (_teilverkauf > 0 &&_teilverkauf * 4000 < (int)(Trade.Quantity * Trade.AvgPrice))        // verkaufe einen Teilbetrag >= 4000 €
-                {
-                    Stueck = (int)(Trade.Quantity/_teilverkauf);    
-                }
-                else
-                {
-                    //Stueck = 1 + (int)(Trade.Quantity * Trade.AvgPrice) / 4000; // verkaufe einen Teilbetrag mit ca. 4.000 €
-                    Stueck = Trade.Quantity;                // verkaufe alles 
-                }
-                if (oBStop != null && oBStop.OrderState == OrderState.Filled)
-                {
-                    AddChartTextFixed("MyText", " Bewegunsstopp ausgeführt ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                    return;
-                }
-
-                if (Chart != null && _profitOnly) AddChartTextFixed("MyText", "Bewegunsstopp für " + Stueck.ToString("F0") + " Stück ProfitOnly " +
-                    (_profit*Trade.AvgPrice*Stueck/1000).ToString("F2") + " €, Soft-Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
-                if (Chart != null && !_profitOnly) AddChartTextFixed("MyText", "Bewegunsstopp für "+ Stueck.ToString("F0") + " Stück  Soft-Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
-
-                if (Trade == null || (Trade != null && (Trade.PositionType == PositionType.Flat)))
-                {
-                    return;
-                }   
-                #endregion Stueck
-
                 if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);    // Tick-Abstand
 
-                #region Stopp_Berechnung
-                // Stopp-Berechnung: bei InsideBar zurück auf Aussenstab, sonst BarByBar
+                #region Stueck
 
-                if (InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] > 0)
+                if (Stueck_Merker)
                 {
-                    Stopp = Instrument.Round2TickSize(InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
-                    // ggf oStop zurücksetzen
-                    if (oBStop != null && oBStop.StopPrice > Stopp)
+                    Stueck_Merker = false;
+                    if ((int)(Trade.Quantity * Trade.AvgPrice / 4000) < _teilverkauf)
+                        _teilverkauf = (int)(Trade.Quantity * Trade.AvgPrice / 4000);
+                    if (_teilverkauf <= 1) Stueck = Trade.Quantity;
+                    else Stueck = (int)(Trade.Quantity / _teilverkauf);
+                }
+
+                if (Trade.Quantity * Trade.AvgPrice < 8000) Stueck = Trade.Quantity;
+
+
+                #endregion Stueck
+              
+                if (!TStopAktiv)
+                {
+                    #region Bewegungsstopp
+
+
+
+                    #region Stopp_Berechnung
+                    // Stopp-Berechnung: bei InsideBar zurück auf Aussenstab, sonst BarByBar
+
+                    if (InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] > 0)
                     {
-                        if ((!_profitOnly || (_profitOnly && (Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)))))    // neuer Stopp auch im Gewinn
+                        Stopp = Instrument.Round2TickSize(InsideBarsMT(Close, InsideBarsMTToleranceUnit.Ticks, _toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
+                        // ggf oStop zurücksetzen
+                        if (oBStop != null && oBStop.StopPrice > Stopp)
                         {
-                            Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice)/2 + Trade.AvgPrice);
-                            ReplaceOrder(oBStop, Stueck, Limit, Stopp);
+                            if ((!_profitOnly || (_profitOnly && (Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)))))    // neuer Stopp auch im Gewinn
+                            {
+                                Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                                ReplaceOrder(oBStop, Stueck, Limit, Stopp);
+                            }
+                            else
+                            {
+                                CancelOrder(oBStop);
+                                oBStop = null;
+                                Limit = 0;
+                            }
+                        }
+                    }
+                    else
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (Low[1] - _abstand * TickSize)));
+
+                    #endregion Stopp_Berechnung
+
+
+                    #region Hardstopp_Berechnung
+
+                    // 1 Hardstopp setzen wenn Position Stopp über Profit liegt
+
+                    if (Position.CreatedDateTime < Time[1] && (oBStop == null || (oBStop != null && oBStop.OrderState == OrderState.Cancelled)) &&
+                        (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                    {
+                        if (_softstopp)
+                        {
+                            Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
+                            Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                        }
+                        if (false)   //(TotalSchutz) //
+                        {
+                            if (_stopLimit)
+                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", BStopp);
+                            else
+                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", BStopp);
                         }
                         else
                         {
-                            CancelOrder(oBStop);
-                            oBStop = null;
-                            Limit = 0;
+                            if (_stopLimit)
+                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
+                            else
+                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
+                        }
+                        if (_automatisch) oBStop.ConfirmOrder();
+                    }
+                    
+                    // Hardstopp auf Low[0] nachsetzen und damit aktivieren
+                    if (oBStop != null && (!_softstopp || _softstopp && Close[0] < Stopp))
+                    {
+                        if (oBStop.OrderState != OrderState.Filled && oBStop.OrderState != OrderState.PendingSubmit &&
+                             oBStop.OrderState != OrderState.PendingReplace && oBStop.OrderState != OrderState.PartFilled)
+                        {
+                            Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                            ReplaceOrder(oBStop, Stueck, Limit,
+                                         Instrument.Round2TickSize(Math.Max(oBStop.StopPrice, (Low[0] - _abstand * TickSize))));
+                        }
+                    }
+                    #endregion Hardstopp_Berechnung
+
+                    #endregion Bewegungsstopp
+                }
+
+                else        // TStopAktiv, Trend-Stopp
+                {
+                    #region Trendstopp
+
+                    _softstopp = false; // Trendstopp nur ohne Stoftstop
+                    _stopLimit = false; // Trend-Stopp arbeitet nur mit Stopp-Order
+
+                    #region Stopp-Berechnung: 
+
+                    if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P123Adv(_trend).ValidP3Price[0]) - _abstand * TickSize);       //im Aufwärtstrend: P3 gültig
+                    else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])  // im Abwärtstrend
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P123Adv(_trend).P1Price[0]) - _abstand * TickSize);               // im Aufwärtsttrend, noch kein P3 vorhanden
+                    else
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P123Adv(_trend).P2Price[0]) - _abstand * TickSize);               // im Abwärtstrend
+
+                    Limit = 0;     // nur Stopp-Order Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                    #endregion Stopp-Berechnung:
+
+                    // 1 Trend-Hardstopp setzen wenn Position Stopp über Profit liegt
+                    if (TotalSchutz)
+                    {
+                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                            (!_profitOnly || (_profitOnly && (Low[1] > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                        {
+                            Stopp = Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize));
+                            if (_stopLimit)
+                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", TStopp);
+                            else
+                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", TStopp);
+                        }
+                        if (_automatisch) oTStop.ConfirmOrder();
+                    }
+                    else
+                    { 
+                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                            (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                        {
+                            if (_softstopp)
+                            {
+                            // Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
+                            // Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                            }
+                        
+                            if (_stopLimit)
+                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", TStopp);
+                            else
+                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", TStopp);
+                        
+                            if (_automatisch) oTStop.ConfirmOrder();
+
+                       }
+                    }
+                    // Hardstopp auf P3[1] nachsetzen und damit aktivieren
+                    if (oTStop != null && oTStop.StopPrice < Stopp)
+                    {
+                        if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                            oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                        {
+                            ReplaceOrder(oTStop, Stueck, Limit,
+                                         Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
                         }
                     }
                 }
-                else
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (Low[1] - _abstand * TickSize)));
-       
-                #endregion Stopp_Berechnung
-                
-              #region Hardstopp_Berechnung
 
-                // 1 Hardstopp setzen wenn Position Stopp über Profit liegt
-                
-                if ((oBStop == null || (oBStop != null && oBStop.OrderState == OrderState.Cancelled)) && 
-                    (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit/1000)* Trade.AvgPrice + _abstand* TickSize))))))  
+                #endregion Trendstopp
+
+                #region Anzeige
+                if (Chart != null)
                 {
-                    if (_softstopp)
-                    {
-                        Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
-                        Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
-                    }
-                    if (_stopLimit)
-                        oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
-                    else
-                        oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
-                    if (_automatisch) oBStop.ConfirmOrder();
-                }
-
-
-                // Hardstopp auf Low[0] nachsetzen und damit aktivieren
-                if (!_softstopp 
-                    || ((oBStop != null) && _softstopp && Close[0] < Stopp))
-                { 
-                    if ( oBStop.OrderState != OrderState.Filled && oBStop.OrderState != OrderState.PendingSubmit &&
-                         oBStop.OrderState != OrderState.PendingReplace && oBStop.OrderState != OrderState.PartFilled)
-                    {
-                        Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
-                        ReplaceOrder(oBStop, Stueck, Limit, 
-                                     Instrument.Round2TickSize(Math.Max(oBStop.StopPrice, (Low[0] - _abstand * TickSize))));
-                    }
-                }
-                    #endregion Hardstopp_Berechnung
-
-                    if (oBStop != null) // || (oStop != null && oStop.OrderState != OrderState.Cancelled))
+                    if (!TStopAktiv) // Bewegungsstopp-Anzeigen)
                     {
                         //  _Test2Plot.Zeichne(Stopp, oStop.StopPrice);
-
-                        if (Chart != null)
-                            AddChartTextFixed("MyText", "Bewegunsstopp für " + Stueck.ToString("F0") + " Stück  Soft-Stopp: " + Stopp.ToString("F2") +
-                            " = " + ((Stopp - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        if (oBStop == null)
+                            AddChartTextFixed("MyText", "Bewegungs-Stopp aktiv, Teilverkäufe: " + _teilverkauf, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        else
+                        {
+                            if (oBStop.OrderState != OrderState.Filled)
+                                AddChartTextFixed("MyText", "Bewegungs-Stopp für " + Stueck.ToString("F0") + " Stück  Hard-Stopp: " + Stopp.ToString("F2") +
+                                " = " + ((Stopp - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                            else
+                                AddChartTextFixed("MyText", "Bewegungs-Stopp ausgeführt " +
+                                " Gewinn: " + (Trade.ClosedProfitLoss - Trade.Commission).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        }
                     }
-               }
-            
-            else        // TStopAktiv, Trend-Stopp
-            {
-                #region Trendstopp
-                Stueck = Trade.Quantity;
-                // P3-Berechnung: im aufwärtstrend:
-                if (P123Adv(_trend).ValidP3Price[1] > P123Adv(_trend).P1Price[1] && P123Adv(_trend).ValidP3DateTime[1] > P123Adv(_trend).P1DateTime[1])
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P123Adv(_trend).ValidP3Price[1])- _abstand * TickSize);
-                else    // im Abwärtstrend
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P123Adv(_trend).P2Price[1]) - _abstand * TickSize);
-
-
-                // 1 Trend-Hardstopp setzen wenn Position Stopp über Profit liegt
-
-                if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
-                    (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
-                {
-                    if (_softstopp)
-                    {
-                       // Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
-                       // Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
-                    }
-                    _stopLimit = false; // Trend-Stopp arbeitet nur mit Stopp-Order
-                    if (_stopLimit)
-                        oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", TStopp);
                     else
-                        oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", TStopp);
-                    if (_automatisch) oTStop.ConfirmOrder();
-                }
-
-
-                // Hardstopp auf P3[1] nachsetzen und damit aktivieren
-                if (oTStop != null && oTStop.StopPrice < Stopp)
-                {
-                    if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
-                         oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
                     {
-                        Limit = 0;     // nur Stopp-Order Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
-                        ReplaceOrder(oTStop, Stueck, Limit,
-                                     Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                        if (oTStop == null)
+                            AddChartTextFixed("MyText", "Trendstopp aktiv, Trend " + _trend + " Teilverkäufe: " + _teilverkauf, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        else
+                        {
+                            if (oTStop.OrderState == OrderState.Filled)
+                                AddChartTextFixed("MyText", "Trendstopp ausgeführt", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
+
+                            else
+                                AddChartTextFixed("MyText", "Trendstopp für " + Stueck.ToString("F0") + " Stück  Hard-Stopp: " + Stopp.ToString("F2") +
+                                  " = " + ((Stopp - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        }
                     }
                 }
-                if (oTStop != null && Chart != null) // || (oStop != null && oStop.OrderState != OrderState.Cancelled))
-                {
-                    //  _Test2Plot.Zeichne(Stopp, oStop.StopPrice);
-
-                    if (oTStop.OrderState != OrderState.Filled)
-                        AddChartTextFixed("MyText", "Trendstopp für " + Stueck.ToString("F0") + " Stück  Hard-Stopp: " + Stopp.ToString("F2") +
-                        " = " + ((Stopp - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
-                    else
-                            AddChartTextFixed("MyText", "Trendstopp ausgeführt "+
-                        " Gewinn: " + (Trade.ClosedProfitLoss - Trade.Commission).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
-                    }
-                #endregion Trendstopp 
+                #endregion Anzeige
             }
         }
-        }
+     
+    
+        
         #region Properties
+
+        [Description("nur Trendstopp")]
+        [Category("Parameters")]
+        public bool TrenStoppOnly
+        {
+            get { return _trendStoppOnly; }
+            set { _trendStoppOnly = value; }
+        }
 
         [Description("Anzahln Teilverkäufe")]
         [Category("Parameters")]
@@ -371,14 +412,14 @@ namespace AgenaTrader.UserCode
             set { _stopLimit = value; }
         }
 
-        [Description("Automatisch")]
+        [Description("Vollkasko für die Gesamtposition")]
         [Category("Parameters")]
-        public bool Automatisch
+        public bool Vollkasko
         {
-            get { return _automatisch; }
-            set { _automatisch = value; }
+            get { return TotalSchutz; }
+            set { TotalSchutz = value; }
         }
-
+        
 
         [Description("SendMail")]
         [Category("Parameters")]
