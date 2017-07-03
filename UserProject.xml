@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<UserProjectConfiguration xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="11">
+<UserProjectConfiguration xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="12">
   <References>
     <string>System</string>
     <string>System.Core</string>
@@ -10,6 +10,6 @@
     <string>C:\Program Files\AgenaTrader\AgenaTrader.Plugins.dll</string>
     <string>C:\Program Files\AgenaTrader\AgenaTrader.API.dll</string>
     <string>C:\Program Files\AgenaTrader\AgenaTrader.Helper.dll</string>
-    <string>C:\Users\Kurt\Documents\AgenaTrader\TA\AgenaTrader.Custom.dll</string>
+    <string>C:\Program Files\AgenaTrader\TA\AgenaTrader.Custom.dll</string>
   </References>
 </UserProjectConfiguration>
