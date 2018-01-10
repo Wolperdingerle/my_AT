@@ -1,4 +1,4 @@
-    using System;
+using System;
     using System.Collections.Generic;
     using System.ComponentModel;
     using System.Drawing;
@@ -14,7 +14,7 @@
     namespace AgenaTrader.UserCode
     {
     //[TimeFrameRequirements("1 Day")]
-    [TimeFrameRequirements("1 Day", "1 Hour","10 Minute", "5 Minute", "1 Minute")]  //Bereitstellung von MTF für evtl. Verwendung in angeschlossenen Conditions
+    [TimeFrameRequirements("1 Day", "1 Hour","10 Minute", "5 Minute", "1 Minute")]  //Bereitstellung von MTF fï¿½r evtl. Verwendung in angeschlossenen Conditions
 
     [Description("Dynamische Listenverwaltung anhand einer Condition")]
        public class Add2List : UserIndicator
@@ -33,7 +33,7 @@
 
         protected override void OnInit()
             {
-            Add(new Plot(Color.FromKnownColor(KnownColor.Orange), "MOFL"));
+            Add(new OutputDescriptor(Color.FromKnownColor(KnownColor.Orange), "MOFL"));
             IsAddDrawingsToPricePanel = false;
             CalculateOnClosedBar = true;
             }
@@ -96,7 +96,7 @@
                     // Signal vorhanden =>> in Zielliste aufnehmen, nicht vorhanden? =>> aus Zielliste entfernen
                     _condiOccurred = GetCondition(Name_of_Condition)[0];
                     MOFL.Set(_condiOccurred);
-                    Print("Symbol: "+ _sourcelist[i].Symbol + " MOfL: " + _condiOccurred + " Länge Source-Liste: " + _sourcelist.Count+  " Name: " + _sourcelist.Name);
+                    Print("Symbol: "+ _sourcelist[i].Symbol + " MOfL: " + _condiOccurred + " Lï¿½nge Source-Liste: " + _sourcelist.Count+  " Name: " + _sourcelist.Name);
                     
                 }
 
@@ -171,120 +171,3 @@
           #endregion
          }
     }
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List()
-        {
-			return Add2List(InSeries);
-		}
-
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List(IDataSeries input)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<Add2List>(input);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new Add2List
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List()
-		{
-			return LeadIndicator.Add2List(InSeries);
-		}
-
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List(IDataSeries input)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
-
-			return LeadIndicator.Add2List(input);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List()
-		{
-			return LeadIndicator.Add2List(InSeries);
-		}
-
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List(IDataSeries input)
-		{
-			return LeadIndicator.Add2List(input);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List()
-		{
-			return LeadIndicator.Add2List(InSeries);
-		}
-
-		/// <summary>
-		/// Dynamische Listenverwaltung anhand einer Condition
-		/// </summary>
-		public Add2List Add2List(IDataSeries input)
-		{
-			return LeadIndicator.Add2List(input);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

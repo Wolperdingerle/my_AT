@@ -18,8 +18,8 @@ using AgenaTrader.Helper;
 /// Christian Kovar 2016
 /// -------------------------------------------------------------------------
 /// This strategy provides provides entry and exit signals for a SMA crossover.
-/// Long  Signal when fast SMA crosses slow SMA above. Plot is set to  1.
-/// Short Signal wenn fast SMA crosses slow SMA below. Plot is set to -1.
+/// Long  Signal when fast SMA crosses slow SMA above. OutputDescriptor is set to  1.
+/// Short Signal wenn fast SMA crosses slow SMA below. OutputDescriptor is set to -1.
 /// StopLoss is set to 1% and Target is set to 3%
 /// You can use this indicator also as a template for further script development.
 /// -------------------------------------------------------------------------
@@ -76,7 +76,7 @@ namespace AgenaTrader.UserCode
 		protected override void OnCalculate()
 		{
             //Set Autopilot
-            this.IsAutomated = this.Autopilot;
+            this.IsAutoConfirmOrder = this.Autopilot;
 
             //Check if peridocity is valid for this script
             if (!this._Example_Indicator_SMA_CrossOver_Advanced.DatafeedPeriodicityIsValid(Bars.TimeFrame))
@@ -100,10 +100,10 @@ namespace AgenaTrader.UserCode
             {
                 switch (returnvalue.Entry)
                 {
-                    case OrderAction.Buy:
+                    case OrderDirection.Buy:
                         this.DoEnterLong();
                         break;
-                    case OrderAction.SellShort:
+                    case OrderDirection.Sell:
                         this.DoEnterShort();
                         break;
                 }
@@ -114,10 +114,10 @@ namespace AgenaTrader.UserCode
             {
                 switch (returnvalue.Exit)
                 {
-                    case OrderAction.BuyToCover:
+                    case OrderDirection.Buy:
                         this.DoExitShort();
                         break;
-                    case OrderAction.Sell:
+                    case OrderDirection.Sell:
                         this.DoExitLong();
                         break;
                 }
@@ -132,7 +132,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderenterlong == null)
             {
-                _orderenterlong = OpenLong(this.DefaultOrderQuantity, this.DisplayName + "_" + OrderAction.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), this.Instrument, this.TimeFrame);
+                _orderenterlong = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
                 
                 //set a stop loss for our order. we set it 1% below the current price
                 SetUpStopLoss(_orderenterlong.Name, CalculationMode.Price, Bars[0].Close * 0.99, false);
@@ -149,7 +149,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderentershort == null)
             {
-                _orderentershort = OpenShort(this.DefaultOrderQuantity, this.DisplayName + "_" + OrderAction.SellShort + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), this.Instrument, this.TimeFrame);
+                _orderentershort = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
 
                 //set a stop loss for our order. we set it 1% above the current price
                 SetUpStopLoss(_orderentershort.Name, CalculationMode.Price, Bars[0].Close * 1.01, false);
@@ -166,7 +166,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderenterlong != null)
             {
-                 CloseLong(this._orderenterlong.Name);
+                 CloseLongTrade(new StrategyOrderParameters {Type = OrderType.Market, Quantity = this._orderenterlong.Name});
                  this._orderenterlong = null;
             }
         }
@@ -178,7 +178,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderentershort != null)
             {
-                CloseShort(this._orderentershort.Name);
+                CloseShortTrade(new StrategyOrderParameters {Type = OrderType.Market, Quantity = this._orderentershort.Name});
                 this._orderentershort = null;
             }
         }

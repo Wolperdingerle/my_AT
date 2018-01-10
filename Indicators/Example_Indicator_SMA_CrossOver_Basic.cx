@@ -18,8 +18,8 @@ using AgenaTrader.Helper;
 /// Christian Kovar 2016
 /// -------------------------------------------------------------------------
 /// This indicator provides entry signals for a SMA crossover.
-/// Long  Signal when SMA20 crosses SMA50 above. Plot is set to  1
-/// Short Signal wenn SMA20 crosses SMA50 below. Plot is set to -1
+/// Long  Signal when SMA20 crosses SMA50 above. OutputDescriptor is set to  1
+/// Short Signal wenn SMA20 crosses SMA50 below. OutputDescriptor is set to -1
 /// You can use this indicator also as a template for further script development.
 /// -------------------------------------------------------------------------
 /// Namespace holds all indicators and is required. Do not change it.
@@ -32,7 +32,7 @@ namespace AgenaTrader.UserCode
 		protected override void OnInit()
 		{
             //Define the plot and its color which is displayed underneath the chart
-			Add(new Plot(Color.Orange, "SMA_CrossOver"));
+			Add(new OutputDescriptor(Color.Orange, "SMA_CrossOver"));
 
             //Define if the OnBarUpdate method should be triggered only on BarClose (=end of period)
             //or with each price update
@@ -101,121 +101,3 @@ namespace AgenaTrader.UserCode
 		#endregion
 	}
 }
-
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic()
-        {
-			return Example_Indicator_SMA_CrossOver_Basic(InSeries);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic(IDataSeries input)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<Example_Indicator_SMA_CrossOver_Basic>(input);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new Example_Indicator_SMA_CrossOver_Basic
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic()
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(InSeries);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic(IDataSeries input)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
-
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(input);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic()
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(InSeries);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic(IDataSeries input)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(input);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic()
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(InSeries);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Basic Example_Indicator_SMA_CrossOver_Basic(IDataSeries input)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Basic(input);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

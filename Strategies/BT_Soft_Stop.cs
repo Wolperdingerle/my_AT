@@ -35,27 +35,27 @@ namespace AgenaTrader.UserCode
     public class BT_Soft_Stop : UserStrategy
     {
         #region Variables
-        private bool _trendStoppOnly = false;    // Schalter Bewegung +  Trend oder nur Trendstopp
-        private int _trend = 2;                 // Trendgröße
+        private bool _trendStoppOnly = true;    // Schalter Bewegung +  Trend oder nur Trendstopp
+        private int _trend = 1;                 // Trendgröße
         private int _abstand = 2;               // Abstand in Ticks vom Low
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Prifit im Promille aktvieren
-        private int _teilverkauf = 2;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
+        private int _teilverkauf = 3;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
         private IOrder oBStop = null;           // Bewegungs-Stopp-Order
         private IOrder oTStop = null;           // Trend-Stopp-Order
         private double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
         private double _profit = 5;             // Mindestprofit in Promille
-        private bool _sendMail = false;         // Email nach Ausführung zusenden
+        private bool _sendMail = true;         // Email nach Ausführung zusenden
         private string BStopp = "Bewegungs-Soft-Stopp";
         private string TStopp = "Trend-Soft-Stopp";
-        private bool TotalSchutz = true;        // frühestmöglicher Schutz für Gesamtposition
-        private bool _stopLimit = true;         // Stopp-Order als Stopp-Limit-Order
+        private bool TotalSchutz = false;        // frühestmöglicher Schutz für Gesamtposition
+        private bool _stopLimit = false;         // Stopp-Order als Stopp-Limit-Order
         private double Limit = 0.0;             // LimitPreis ist die Hälfte aus Stopp und Einstiegspreis berechnet
-        private bool _softstopp = true;         // Stopp als Softstopp Bar by Bar
+        private bool _softstopp = false;         // Stopp als Softstopp Bar by Bar
         private int _toleranz = 2;              // Toleranz in Tick bei InsideBars
-        private bool TStopAktiv = false;        // Steuervariable Bewegungs / Trendstopp
-        private bool Stueck_Merker = true;
+        private bool TStopAktiv = true;        // Steuervariable Bewegungs / Trendstopp
+        private bool Stueck_Merker = true;      
         //    private Test2Plot _Test2Plot = null;
 
         #endregion
@@ -64,7 +64,7 @@ namespace AgenaTrader.UserCode
         {
             CalculateOnClosedBar = true;
             RequiredBarsCount = 500;
-            IsAutomated = _automatisch;
+            IsAutoConfirmOrder = _automatisch;
             Abstand = _abstand;
             Teilverkauf = _teilverkauf;
             SoftStopp = _softstopp;
@@ -118,7 +118,7 @@ namespace AgenaTrader.UserCode
                     int i = 0;
                     do
                     {
-                        if (Orders[i].Action == OrderAction.Sell && Orders[i].OrderState != OrderState.Filled && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
+                        if (Orders[i].Direction == OrderDirection.Sell && Orders[i].OrderState != OrderState.Filled && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
                         {
                             if (TStopAktiv) oTStop = Orders[i];
                             else oBStop = Orders[i];
@@ -171,7 +171,7 @@ namespace AgenaTrader.UserCode
                             }
                             else
                             {
-                                CancelOrder(oBStop);
+                               oBStop.CancelOrder();
                                 oBStop = null;
                                 Limit = 0;
                             }
@@ -195,19 +195,19 @@ namespace AgenaTrader.UserCode
                             Stopp = Instrument.Round2TickSize((1 + _profit / 1000) * Trade.AvgPrice);
                             Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
                         }
-                        if (false)   //(TotalSchutz) //
+                        if (TotalSchutz)   //(TotalSchutz) //
                         {
                             if (_stopLimit)
-                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", BStopp);
+                                oBStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", BStopp);
                             else
-                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", BStopp);
+                                oBStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", BStopp);
                         }
                         else
                         {
                             if (_stopLimit)
-                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
+                                oBStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
                             else
-                                oBStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
+                                oBStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
                         }
                         if (_automatisch) oBStop.ConfirmOrder();
                     }
@@ -255,9 +255,9 @@ namespace AgenaTrader.UserCode
                         {
                             Stopp = Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize));
                             if (_stopLimit)
-                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", TStopp);
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp B", TStopp);
                             else
-                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", TStopp);
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp B", TStopp);
                         }
                         if (_automatisch) oTStop.ConfirmOrder();
                     }
@@ -273,9 +273,9 @@ namespace AgenaTrader.UserCode
                             }
                         
                             if (_stopLimit)
-                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", TStopp);
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", TStopp);
                             else
-                                oTStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", TStopp);
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", TStopp);
                         
                             if (_automatisch) oTStop.ConfirmOrder();
 

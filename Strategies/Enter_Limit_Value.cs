@@ -32,7 +32,7 @@ namespace AgenaTrader.UserCode
         {
             CalculateOnClosedBar = false;
             RequiredBarsCount = 2;
-            IsAutomated = _automatisch;
+            IsAutoConfirmOrder = _automatisch;
         }
         protected override void OnStart()
         {
@@ -44,7 +44,7 @@ namespace AgenaTrader.UserCode
                 int i = 0;
                 do
                 {
-                    if (Orders[i].Action == OrderAction.Buy && Orders[i].OrderState != OrderState.Filled && Orders[i].OrderType == OrderType.Limit)
+                    if (Orders[i].Direction == OrderDirection.Buy && Orders[i].OrderState != OrderState.Filled && Orders[i].OrderType == OrderType.Limit)
                     {
                         EnterOrder = Orders[i];
                        // _kapital = EnterOrder.Quantity * EnterOrder.LimitPrice;
@@ -70,7 +70,7 @@ namespace AgenaTrader.UserCode
 
         protected override void OnOrderChanged( IOrder Order)
         {
-            if (Order.Action == OrderAction.Buy && Order.OrderState != OrderState.PendingReplace && Order.OrderState != OrderState.PartFilled && Order.OrderState != OrderState.PendingSubmit
+            if (Order.Direction == OrderDirection.Buy && Order.OrderState != OrderState.PendingReplace && Order.OrderState != OrderState.PartFilled && Order.OrderState != OrderState.PendingSubmit
                 && Order.OrderState != OrderState.PendingCancel && Order.OrderState != OrderState.Filled)
             {
                 if(Order.LimitPrice > 0 && Order.Quantity != (int)(_kapital / Order.LimitPrice) + 1)
@@ -100,7 +100,7 @@ namespace AgenaTrader.UserCode
             if (EnterOrder == null)
             {
                 LimitPreis = Instrument.Round2TickSize(Close[0] *0.985); // Limitpries 1,5% unter letztem Kurs
-                EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.Limit, (int)((_kapital / LimitPreis) + 1), LimitPreis, 0, orderName, orderName);
+                EnterOrder = SubmitOrder(0, OrderDirection.Buy, OrderType.Limit, (int)((_kapital / LimitPreis) + 1), LimitPreis, 0, orderName, orderName);
             }
             else
                 if (EnterOrder.OrderState == OrderState.Filled) return;

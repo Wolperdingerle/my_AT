@@ -13,7 +13,7 @@ using AgenaTrader.Helper;
 
 
 /*  Indikator BarbyBar-Soft-Stopp unter Berücksichtigung Insidebar MT
- *  Anzeige des Plots nur bei offener Position
+ *  Anzeige des OutputDescriptors nur bei offener Position
  *  Softstopp und Hardstopp
  *  Hardstopp wird bei überschreiten der Gewinnschwelle aktiviert und bleibt dort.
  *  Ist Close[0] < Softstopp[0]
@@ -26,8 +26,8 @@ namespace AgenaTrader.UserCode
     public class ResultValue_StopBarByBar
     {
         public bool ErrorOccured = false;
-        public OrderAction? Entry = null;
-        public OrderAction? Exit = null;
+        public OrderDirection? Entry = null;
+        public OrderDirection? Exit = null;
         public double Price = 0.0;
         public double Slow = 0.0;
         public double Fast = 0.0;
@@ -74,8 +74,8 @@ namespace AgenaTrader.UserCode
             Abstand = _abstand;
             IsOverlay = true;
             //Define the plots and its color which is displayed underneath the chart
-            Add(new Plot(this.Plot0Color, "Soft-Stopp"));
-            Add(new Plot(this.Plot1Color, "Hard-Stopp"));
+            Add(new OutputDescriptor(this.Plot0Color, "Soft-Stopp"));
+            Add(new OutputDescriptor(this.Plot1Color, "Hard-Stopp"));
 
 
         }
@@ -166,11 +166,11 @@ namespace AgenaTrader.UserCode
             }
             //Set the drawing style, if the user has changed it.
             PlotColors[0][0] = this.Plot0Color;
-            Plots[0].PenStyle = this.Dash0Style;
-            Plots[0].Pen.Width = this.Plot0Width;
+            OutputDescriptors[0].PenStyle = this.Dash0Style;
+            OutputDescriptors[0].Pen.Width = this.Plot0Width;
             PlotColors[1][0] = this.Plot1Color;
-            Plots[1].PenStyle = this.Dash1Style;
-            Plots[1].Pen.Width = this.Plot1Width;
+            OutputDescriptors[1].PenStyle = this.Dash1Style;
+            OutputDescriptors[1].Pen.Width = this.Plot1Width;
         }
         /// <summary>
         /// In this method we do all the work and return the object with all data like the OrderActions.
@@ -204,11 +204,11 @@ namespace AgenaTrader.UserCode
                 {
                     if (islongenabled)
                     {
-                 //       returnvalue.Entry = OrderAction.Buy;
+                 //       returnvalue.Entry = OrderDirection.Buy;
                     }
                  //   if (isshortenabled)
                     {
-                   //     returnvalue.Exit = OrderAction.BuyToCover;
+                   //     returnvalue.Exit = OrderDirection.Buy;
                     }
 
                 }
@@ -219,11 +219,11 @@ namespace AgenaTrader.UserCode
                     
                     if (islongenabled)
                     {
-                        returnvalue.Exit = OrderAction.Sell;
+                        returnvalue.Exit = OrderDirection.Sell;
                     }
                     if (isshortenabled)
                     {
-                        returnvalue.Entry = OrderAction.SellShort;
+                        returnvalue.Entry = OrderDirection.Sell;
                     }
                 }
                 */
@@ -469,7 +469,7 @@ namespace AgenaTrader.UserCode
 
 
 
-        #region Output Datenserie für Plot
+        #region Output Datenserie für OutputDescriptor
 
         [Browsable(false)]
         [XmlIgnore()]
@@ -493,127 +493,3 @@ namespace AgenaTrader.UserCode
         #endregion
     }
 }
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-        {
-			return StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<StopBarByBar>(input, i => i.FastSma == fastSma && i.SlowSma == slowSma && i.IsLongEnabled == isLongEnabled && i.IsShortEnabled == isShortEnabled && i.Profit == profit && i.Abstand == abstand && i.Toleranz == toleranz);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new StopBarByBar
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input,
-							FastSma = fastSma,
-							SlowSma = slowSma,
-							IsLongEnabled = isLongEnabled,
-							IsShortEnabled = isShortEnabled,
-							Profit = profit,
-							Abstand = abstand,
-							Toleranz = toleranz
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
-
-			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			return LeadIndicator.StopBarByBar(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-
-		/// <summary>
-		/// Bewegungsstopp Bar by Bar
-		/// </summary>
-		public StopBarByBar StopBarByBar(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled, System.Int32 profit, System.Int32 abstand, System.Int32 toleranz)
-		{
-			return LeadIndicator.StopBarByBar(input, fastSma, slowSma, isLongEnabled, isShortEnabled, profit, abstand, toleranz);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

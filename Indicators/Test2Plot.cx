@@ -1,0 +1,76 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+	[Description("Test mit 2 Plot")]
+	public class Test2Plot : UserIndicator
+    {
+        #region Variables
+
+        public double SoftStopp = 0.0;
+        public double HardStopp = 0.0;
+
+        private int _BarsRequired = 2;
+
+        #endregion Variables
+        protected override void OnInit()
+		{
+            RequiredBarsCount = _BarsRequired;
+            Add(new OutputDescriptor(Color.FromArgb(255, 102, 255, 255), OutputSerieDrawStyle.Cross, "Soft_Stopp"));
+            OutputDescriptors[0].Pen.Width = 2;
+            Add(new OutputDescriptor(Color.FromKnownColor(KnownColor.Green), OutputSerieDrawStyle.Hash, "Hard_Stopp"));
+            OutputDescriptors[1].Pen.Width = 3;
+            IsOverlay = true;
+			CalculateOnClosedBar = true;
+            
+
+        }
+        
+		protected override void OnCalculate()
+		{
+           // SoftStopp = High[0];
+           // HardStopp = Low[0];
+            Soft_Stopp.Set(SoftStopp);
+            // was ge�ndert, test
+			Hard_Stopp.Set(HardStopp);
+		}
+       
+        public void Zeichne(double SoftStopp, double HardStopp)
+        {
+            if (SoftStopp > 1) Soft_Stopp.Set(SoftStopp);
+            if (HardStopp > 1) Hard_Stopp.Set(HardStopp);
+        }
+        
+		#region Properties
+        
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Soft_Stopp
+		{
+			get { return Outputs[0]; }
+            //set { Outputs[0] = value; }
+        }
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Hard_Stopp
+		{
+			get { return Outputs[1]; }
+            //set { Outputs[1] = value; }
+            //set { _profitOnly = value; }
+        }
+        
+		#endregion
+	}
+}

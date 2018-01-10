@@ -18,8 +18,8 @@ using AgenaTrader.Helper;
 /// Christian Kovar 2016
 /// -------------------------------------------------------------------------
 /// This indicator provides entry and exit signals for a SMA crossover.
-/// Long  Signal when fast SMA crosses slow SMA above. Plot is set to  1.
-/// Short Signal wenn fast SMA crosses slow SMA below. Plot is set to -1.
+/// Long  Signal when fast SMA crosses slow SMA above. OutputDescriptor is set to  1.
+/// Short Signal wenn fast SMA crosses slow SMA below. OutputDescriptor is set to -1.
 /// You can use this indicator also as a template for further script development.
 /// -------------------------------------------------------------------------
 /// Namespace holds all indicators and is required. Do not change it.
@@ -28,14 +28,14 @@ namespace AgenaTrader.UserCode
 {
 
     /// <summary>
-    /// Class which holds all important data like the OrderAction. 
+    /// Class which holds all important data like the OrderDirection. 
     /// We use this object as a global default return object for the calculate method in indicators.
     /// </summary>
     public class ResultValue_Example_Indicator_SMA_CrossOver_Advanced
     {
         public bool ErrorOccured = false;
-        public OrderAction? Entry = null;
-        public OrderAction? Exit = null;
+        public OrderDirection? Entry = null;
+        public OrderDirection? Exit = null;
         public double Price = 0.0;
         public double Slow = 0.0;
         public double Fast = 0.0;
@@ -69,8 +69,8 @@ namespace AgenaTrader.UserCode
         protected override void OnInit()
         {
             //Define the plots and its color which is displayed underneath the chart
-            Add(new Plot(this.Plot0Color, "SMA_CrossOver_Entry"));
-            Add(new Plot(this.Plot1Color, "SMA_CrossOver_Exit"));
+            Add(new OutputDescriptor(this.Plot0Color, "SMA_CrossOver_Entry"));
+            Add(new OutputDescriptor(this.Plot1Color, "SMA_CrossOver_Exit"));
 
             //Define if the OnBarUpdate method should be triggered only on BarClose (=end of period)
             //or with each price update
@@ -117,10 +117,10 @@ namespace AgenaTrader.UserCode
             {
                 switch (returnvalue.Entry)
                 {
-                    case OrderAction.Buy:
+                    case OrderDirection.Buy:
                         AddChartDot("ArrowLong_Entry" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
                         break;
-                    case OrderAction.SellShort:
+                    case OrderDirection.Sell:
                         AddChartDiamond("ArrowShort_Entry" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
                         break;
                 }
@@ -132,10 +132,10 @@ namespace AgenaTrader.UserCode
             //{
             //    switch (returnvalue.Exit)
             //    {
-            //        case OrderAction.BuyToCover:
+            //        case OrderDirection.Buy:
             //            AddChartDiamond("ArrowShort_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
             //            break;
-            //        case OrderAction.Sell:
+            //        case OrderDirection.Sell:
             //            AddChartDot("ArrowLong_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
             //            break;
             //    }
@@ -144,11 +144,11 @@ namespace AgenaTrader.UserCode
 
             //Set the drawing style, if the user has changed it.
             PlotColors[0][0] = this.Plot0Color;
-            Plots[0].PenStyle = this.Dash0Style;
-            Plots[0].Pen.Width = this.Plot0Width;
+            OutputDescriptors[0].PenStyle = this.Dash0Style;
+            OutputDescriptors[0].Pen.Width = this.Plot0Width;
             PlotColors[1][0] = this.Plot1Color;
-            Plots[1].PenStyle = this.Dash0Style;
-            Plots[1].Pen.Width = this.Plot0Width;
+            OutputDescriptors[1].PenStyle = this.Dash0Style;
+            OutputDescriptors[1].Pen.Width = this.Plot0Width;
         }
 
 
@@ -179,11 +179,11 @@ namespace AgenaTrader.UserCode
                 {
                     if (islongenabled)
                     {
-                        returnvalue.Entry = OrderAction.Buy;
+                        returnvalue.Entry = OrderDirection.Buy;
                     }
                     if (isshortenabled)
                     {
-                        returnvalue.Exit = OrderAction.BuyToCover;
+                        returnvalue.Exit = OrderDirection.Buy;
                     }
                    
                 }
@@ -191,11 +191,11 @@ namespace AgenaTrader.UserCode
                 {
                     if (islongenabled)
                     {
-                        returnvalue.Exit = OrderAction.Sell;
+                        returnvalue.Exit = OrderDirection.Sell;
                     }
                     if (isshortenabled)
                     {
-                        returnvalue.Entry = OrderAction.SellShort;
+                        returnvalue.Entry = OrderDirection.Sell;
                     }
                 }
 
@@ -416,125 +416,3 @@ namespace AgenaTrader.UserCode
 
     }
 }
-
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-        {
-			return Example_Indicator_SMA_CrossOver_Advanced(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<Example_Indicator_SMA_CrossOver_Advanced>(input, i => i.FastSma == fastSma && i.SlowSma == slowSma && i.IsLongEnabled == isLongEnabled && i.IsShortEnabled == isShortEnabled);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new Example_Indicator_SMA_CrossOver_Advanced
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input,
-							FastSma = fastSma,
-							SlowSma = slowSma,
-							IsLongEnabled = isLongEnabled,
-							IsShortEnabled = isShortEnabled
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'Initialize()' method");
-
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(input, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(input, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(InSeries, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-
-		/// <summary>
-		/// Basic indicator example for SMA crossover
-		/// </summary>
-		public Example_Indicator_SMA_CrossOver_Advanced Example_Indicator_SMA_CrossOver_Advanced(IDataSeries input, System.Int32 fastSma, System.Int32 slowSma, System.Boolean isLongEnabled, System.Boolean isShortEnabled)
-		{
-			return LeadIndicator.Example_Indicator_SMA_CrossOver_Advanced(input, fastSma, slowSma, isLongEnabled, isShortEnabled);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

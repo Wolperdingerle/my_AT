@@ -40,23 +40,25 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-    [Description("BarByBar Gewinn-Stopp")]
+    [Description("Trend Gewinn-Stopp Trend 1")]
     [IsEntryAttribute(false)]
     [IsStopAttribute(true)]
     [IsTargetAttribute(false)]
-    [OverrulePreviousStopPrice(true)]
+    [OverrulePreviousStopPrice(false)]
 
-    public class MyBarMover : UserScriptedCondition
+    public class MyP3_Stopp_T1 : UserScriptedCondition
     {
         #region Variables
         private int _abstand = 2;
         private int _toleranz = 1;
-        private double _profit = 2;
+        private int _trend = 1;
+        private double _profit = 5;
         private double Stopp;
+        private double P3 = 0;
         
         #endregion
 
-        public MyBarMover()
+        public MyP3_Stopp_T1()
         {
            
         }
@@ -70,8 +72,8 @@ namespace AgenaTrader.UserCode
             IsEntry = false;
             IsStop = true;
             IsTarget = false;
-            Add(new Plot(Color.Transparent, "Occurred"));
-            Add(new Plot(Color.Magenta, "Stop"));   // Kurs des Stops
+            Add(new OutputDescriptor(Color.Transparent, "Occurred"));
+            Add(new OutputDescriptor(Color.Magenta, "Stop"));   // Kurs des Stops
         }
 
         protected override void OnStart()
@@ -86,12 +88,12 @@ namespace AgenaTrader.UserCode
 
         /// <summary>
 
-        /// Recalculate wird z. B. von AT++ aufgerufen, wenn man �ber die
-        /// ActionBar f�r die B/S-Buttons kauft bzw. verkauft (oder �ber
-        /// das Kontextmen�).
+        /// Recalculate wird z. B. von AT++ aufgerufen, wenn man über die
+        /// ActionBar für die B/S-Buttons kauft bzw. verkauft (oder über
+        /// das Kontextmenü).
         /// 
-        /// �ber Recalculate wird die initiale TradeDirection abgerufen,
-        /// liegt das Setup im Markt, dann geht die Reise �ber OnBarUpdate
+        /// über Recalculate wird die initiale TradeDirection abgerufen,
+        /// liegt das Setup im Markt, dann geht die Reise über OnBarUpdate
         /// weiter.
         /// </summary>
         public override void Recalculate()
@@ -103,22 +105,19 @@ namespace AgenaTrader.UserCode
         private void CalculateStop()
         {
             // Occurred muss beim Stop nicht gesetzt werden, weil der Stop
-            // nur von der Traderichtung abh�ngig ist.
+            // nur von der Traderichtung abhängig ist.
             switch (TradeDirection)
             {
                 case PositionType.Long:
-                    if (InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, _toleranz).IsInsideBar[0] == 1.0)
-                    {
-                        Stopp = Instrument.Round2TickSize(InsideBarsMT(InSeries, InsideBarsMTToleranceUnit.Ticks, _toleranz).LowBeforeOutsideBar[0] - _abstand * TickSize);
-                    }
+                    // letzten P3 bestimmen (Up-Trend aktiv oder P2 bei gebrochenem Trend
+                    if (P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])   // Up-Trend
+                        P3 = Math.Max(P123Adv(_trend).P1Price[0], P123Adv(_trend).ValidP3Price[0]);
                     else
-                    {
-                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (Low[0] - _abstand * TickSize)));
-                    }
+                        P3 = P123Adv(_trend).P2Price[0];        // Down-Trend
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, P3) - _abstand * TickSize);
+
                     if ((_profit == 0) || (TradeInfo != null && _profit > 0 && Stopp > TradeInfo.AvgPrice * (1 + _profit / 1000)))
-                    {
                         Stop.Set(Stopp);
-                    }
                     break;
 
                 case PositionType.Short:
@@ -205,129 +204,9 @@ namespace AgenaTrader.UserCode
             get { return _profit; }
             set { _profit = Math.Max(0, value); }
         }
+
         #endregion
 
     }
 
 }
-
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-        {
-			return MyBarMover(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<MyBarMover>(input, i => i.Tick_Abstand_vom_Bar == tick_Abstand_vom_Bar && i.Toleranz_InsideBars == toleranz_InsideBars && Math.Abs(i.Profit_Promille - profit_Promille) <= Double.Epsilon);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new MyBarMover
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input,
-							Tick_Abstand_vom_Bar = tick_Abstand_vom_Bar,
-							Toleranz_InsideBars = toleranz_InsideBars,
-							Profit_Promille = profit_Promille
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyBarMover(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
-
-			return LeadIndicator.MyBarMover(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyBarMover(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyBarMover(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyBarMover(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// BarByBar Gewinn-Stopp
-		/// </summary>
-		public MyBarMover MyBarMover(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyBarMover(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

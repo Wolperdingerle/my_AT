@@ -40,25 +40,25 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-    [Description("Trend Gewinn-Stopp Trend 2")]
+    [Description("Trend Gewinn-Stopp Trend 0")]
     [IsEntryAttribute(false)]
     [IsStopAttribute(true)]
     [IsTargetAttribute(false)]
     [OverrulePreviousStopPrice(false)]
 
-    public class MyP3_Stopp_T2 : UserScriptedCondition
+    public class MyP3_Stopp_T0 : UserScriptedCondition
     {
         #region Variables
         private int _abstand = 2;
         private int _toleranz = 1;
-        private int _trend = 2;
+        private int _trend = 0;
         private double _profit = 5;
         private double Stopp;
         private double P3 = 0;
         
         #endregion
 
-        public MyP3_Stopp_T2()
+        public MyP3_Stopp_T0()
         {
            
         }
@@ -72,8 +72,8 @@ namespace AgenaTrader.UserCode
             IsEntry = false;
             IsStop = true;
             IsTarget = false;
-            Add(new Plot(Color.Transparent, "Occurred"));
-            Add(new Plot(Color.Magenta, "Stop"));   // Kurs des Stops
+            Add(new OutputDescriptor(Color.Transparent, "Occurred"));
+            Add(new OutputDescriptor(Color.Magenta, "Stop"));   // Kurs des Stops
         }
 
         protected override void OnStart()
@@ -210,124 +210,3 @@ namespace AgenaTrader.UserCode
     }
 
 }
-
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-	#region Indicator
-
-	public partial class UserIndicator
-	{
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-        {
-			return MyP3_Stopp_T2(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			var indicator = CachedCalculationUnits.GetCachedIndicator<MyP3_Stopp_T2>(input, i => i.Tick_Abstand_vom_Bar == tick_Abstand_vom_Bar && i.Toleranz_InsideBars == toleranz_InsideBars && Math.Abs(i.Profit_Promille - profit_Promille) <= Double.Epsilon);
-
-			if (indicator != null)
-				return indicator;
-
-			indicator = new MyP3_Stopp_T2
-						{
-							RequiredBarsCount = RequiredBarsCount,
-							CalculateOnClosedBar = CalculateOnClosedBar,
-							InSeries = input,
-							Tick_Abstand_vom_Bar = tick_Abstand_vom_Bar,
-							Toleranz_InsideBars = toleranz_InsideBars,
-							Profit_Promille = profit_Promille
-						};
-			indicator.SetUp();
-
-			CachedCalculationUnits.AddIndicator2Cache(indicator);
-
-			return indicator;
-		}
-	}
-
-	#endregion
-
-	#region Strategy
-
-	public partial class UserStrategy
-	{
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyP3_Stopp_T2(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			if (IsInInit && input == null)
-				throw new ArgumentException("You only can access an indicator with the default input/bar series from within the 'OnInit()' method");
-
-			return LeadIndicator.MyP3_Stopp_T2(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-	#region Column
-
-	public partial class UserColumn
-	{
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyP3_Stopp_T2(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyP3_Stopp_T2(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-	#region Scripted Condition
-
-	public partial class UserScriptedCondition
-	{
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyP3_Stopp_T2(InSeries, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-
-		/// <summary>
-		/// Trend Gewinn-Stopp Trend 2
-		/// </summary>
-		public MyP3_Stopp_T2 MyP3_Stopp_T2(IDataSeries input, System.Int32 tick_Abstand_vom_Bar, System.Int32 toleranz_InsideBars, System.Double profit_Promille)
-		{
-			return LeadIndicator.MyP3_Stopp_T2(input, tick_Abstand_vom_Bar, toleranz_InsideBars, profit_Promille);
-		}
-	}
-
-	#endregion
-
-}
-
-#endregion

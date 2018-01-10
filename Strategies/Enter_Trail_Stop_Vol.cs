@@ -10,6 +10,9 @@ using AgenaTrader.API;
 using AgenaTrader.Custom;
 using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
+/// <summary>
+/// Änderung: Order wird gelöscht, ween bei aktiver Order das Kapital nicht mehr ausreicht
+/// </summary>
 
 namespace AgenaTrader.UserCode
 {
@@ -22,7 +25,7 @@ namespace AgenaTrader.UserCode
          */
     #region Variables
 
-	    private int _kapital = 5000;
+	    private int _kapital = 5000;// vorschschlagenes Kapital
         private int _abstand = 2;
         private int _delta = 5;
         private bool _automatisch = true;
@@ -43,7 +46,7 @@ namespace AgenaTrader.UserCode
 		{
 			CalculateOnClosedBar = true;
             Kapital = _kapital;
-            IsAutomated = _automatisch;
+            IsAutoConfirmOrder = _automatisch;
             BarBack = _barBack;
             StopLimit = _stopLimit;
             RequiredBarsCount = _barBack +1;
@@ -84,7 +87,7 @@ namespace AgenaTrader.UserCode
                 int i = 0;
                 do
                 {
-                    if (Orders[i].Action == OrderAction.Buy && Orders[i].OrderState != OrderState.Filled)
+                    if (Orders[i].Direction == OrderDirection.Buy && Orders[i].OrderState != OrderState.Filled)
                     {
                         if (_stopLimit && Orders[i].OrderType == OrderType.StopLimit)
                             EnterOrder = Orders[i];
@@ -114,9 +117,9 @@ namespace AgenaTrader.UserCode
                 StopPreis =  Instrument.Round2TickSize(HighestHighPrice(_barBack)[0] + _abstand * TickSize); // Limitpreis über das letzte Hoch
                 quantity = (int)((_kapital / StopPreis) + 1);
                 if(_stopLimit)
-                    EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.StopLimit, quantity, StopPreis + _delta * TickSize, StopPreis, "Enter_TS", orderName);
+                    EnterOrder = SubmitOrder(0, OrderDirection.Buy, OrderType.StopLimit, quantity, StopPreis + _delta * TickSize, StopPreis, "Enter_TS", orderName);
                 else
-                    EnterOrder = SubmitOrder(0, OrderAction.Buy, OrderType.Stop, quantity, 0, StopPreis, "Enter_TS", orderName);
+                    EnterOrder = SubmitOrder(0, OrderDirection.Buy, OrderType.Stop, quantity, 0, StopPreis, "Enter_TS", orderName);
                 Wert = EnterOrder.Quantity * EnterOrder.StopPrice;
 
                 //if (LimitOrder != null) CreateOCOGroup(new List<IOrder> {EnterOrder, LimitOrder});
@@ -130,9 +133,9 @@ namespace AgenaTrader.UserCode
                     StopPreis = Math.Min(StopPreis, Instrument.Round2TickSize(HighestHighPrice(_barBack)[0] + _abstand * TickSize)); // Limitpreis über das letzte Hoch
                     quantity = (int)((_kapital / StopPreis) + 1);
                     if(EnterOrder.OrderType == OrderType.StopLimit)
-                        ReplaceOrder(EnterOrder, quantity, StopPreis + _delta * TickSize, StopPreis);
+                        ReplaceOrder(EnterOrder, quantity, Instrument.Round2TickSize(StopPreis + _delta * TickSize), Instrument.Round2TickSize(StopPreis));
                     else
-                        ReplaceOrder(EnterOrder, quantity, 0, StopPreis);
+                        ReplaceOrder(EnterOrder, quantity, 0, Instrument.Round2TickSize(StopPreis));
                     Wert = EnterOrder.Quantity * EnterOrder.StopPrice;
                     if (Chart != null) AddChartTextFixed("MyText", "Stop-Limit-Kauf für ca. " + Wert.ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
                 }

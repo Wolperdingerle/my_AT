@@ -13,8 +13,8 @@ using AgenaTrader.Plugins;
 /// Christian Kovar 2016
 /// -------------------------------------------------------------------------
 /// This scripted condition provides entry signals for a SMA crossover.
-/// Long  Signal when SMA20 crosses SMA50 above. Plot is set to  1
-/// Short Signal wenn SMA20 crosses SMA50 below. Plot is set to -1
+/// Long  Signal when SMA20 crosses SMA50 above. OutputDescriptor is set to  1
+/// Short Signal wenn SMA20 crosses SMA50 below. OutputDescriptor is set to -1
 /// You can use this indicator also as a template for further script development.
 /// -------------------------------------------------------------------------
 /// Namespace holds all indicators and is required. Do not change it.
@@ -33,8 +33,8 @@ namespace AgenaTrader.UserCode
 			IsEntry = true;
 			IsStop = false;
 			IsTarget = false;
-			Add(new Plot(Color.FromKnownColor(KnownColor.Black), "Occurred"));
-			Add(new Plot(Color.FromArgb(255, 141, 115, 149), "Entry"));
+			Add(new OutputDescriptor(Color.FromKnownColor(KnownColor.Black), "Occurred"));
+			Add(new OutputDescriptor(Color.FromArgb(255, 141, 115, 149), "Entry"));
 			IsOverlay = true;
 			CalculateOnClosedBar = true;
 
@@ -98,10 +98,3 @@ namespace AgenaTrader.UserCode
 		#endregion
 	}
 }
-#region AgenaTrader Automaticaly Generated Code. Do not change it manualy
-
-namespace AgenaTrader.UserCode
-{
-}
-
-#endregion

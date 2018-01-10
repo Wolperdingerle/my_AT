@@ -54,7 +54,7 @@ namespace AgenaTrader.UserCode
 		{
 			CalculateOnClosedBar = true;
             RequiredBarsCount = 3;
-            IsAutomated = _automatisch;
+            IsAutoConfirmOrder = _automatisch;
             Abstand = _abstand;
             Teilverkauf = _teilverkauf;
             SoftStopp = _softstopp;
@@ -99,7 +99,7 @@ namespace AgenaTrader.UserCode
                     int i = 0;
                     do
                     {
-                        if (Orders[i].Action == OrderAction.Sell && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
+                        if (Orders[i].Direction == OrderDirection.Sell && (Orders[i].OrderType == OrderType.Stop || Orders[i].OrderType == OrderType.StopLimit))
                         {
                             oStop = Orders[i];
                             Stopp = oStop.StopPrice;
@@ -176,7 +176,7 @@ namespace AgenaTrader.UserCode
                         }
                         else
                         {
-                            CancelOrder(oStop);
+                           oStop.CancelOrder();
                             oStop = null;
                             Limit = 0;
                         }
@@ -200,9 +200,9 @@ namespace AgenaTrader.UserCode
                         Limit = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
                     }
                     if (_stopLimit)
-                        oStop = SubmitOrder(0, OrderAction.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
+                        oStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp B", BStopp);
                     else
-                        oStop = SubmitOrder(0, OrderAction.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
+                        oStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp B", BStopp);
                     if (_automatisch) oStop.ConfirmOrder();
                 }
 

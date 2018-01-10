@@ -35,7 +35,7 @@ namespace AgenaTrader.UserCode
 
 		protected UserStrategy()
 		{
-			IsAutomated = true;
+			IsAutoConfirmOrder = true;
 		}
 
 		public override void Dispose()

@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
-<UserProjectConfiguration xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="12">
+<UserProjectConfiguration xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" Version="13">
   <References>
+    <string>mscorlib</string>
     <string>System</string>
     <string>System.Core</string>
     <string>System.Data</string>
