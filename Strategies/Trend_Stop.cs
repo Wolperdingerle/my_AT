@@ -12,6 +12,8 @@ using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
 
 /// <summary>
+/// 
+/// Stopp auf volle 10 Ct runden wegen TWS-Error 110
 /// Trendstop am P3, Trendstärke einstellbar.
 /// 1. Hardstopp immer für die gesamte Position, wenn Profit überschritten wird.
 /// Wird der 1. Hardstopp nachgezogen, dann nur für die Teilposition (einstellbar, min 4.000 €) Position
@@ -39,7 +41,7 @@ namespace AgenaTrader.UserCode
         //private bool _trendStoppOnly = false;    // Schalter Bewegung +  Trend oder nur Trendstopp
         private int _trend = 1;                 // Trendgröße
         private int _abstand = 2;               // Abstand in Ticks vom Low
-        private double _ATR_Faktor = 1.0;       // ATR-Faktor Abstand Stopp-Limit
+        private double _ATR_Faktor = 1.3;       // ATR-Faktor Abstand Stopp-Limit
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Pr0fit im Promille aktvieren
         private int _teilverkauf = 3;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
@@ -149,85 +151,104 @@ namespace AgenaTrader.UserCode
                 #region Trend-Stopp-Berechnung: 
 
                 if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize));       //im Aufwärtstrend: P3 gültig
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize)));       //im Aufwärtstrend: P3 gültig
                 else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize);            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize));            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
                 else if (P123Adv(_trend).P2Price[0] < P123Adv(_trend).P1Price[0] && P123Adv(_trend).TempP3DateTime[0] > P123Adv(_trend).P2DateTime[0] 
                        && P123Adv(_trend).P2DateTime[0] < P123Adv(_trend).TempP3DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize);           //im Abwärtstrend: TempP3 gültig, Stopp am letztenP2
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: TempP3 gültig, Stopp am letztenP2
                 else if (P123Adv(_trend).P2DateTime[0] < Trade.CreatedDateTime)
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize);           //im Abwärtstrend: P2 vor Kauf, Stopp am gültigen P2
-                //else Stopp = (Close[0] - Trade.AvgPrice)/2 + Trade.AvgPrice);                             // Sonderfall: nach auslösen des Stopp Sperre bis neuem, gültigen Stopp
+                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: P2 vor Kauf, Stopp am gültigen P2
+                //else Stopp = Instrument.Round2TickSize((Close[0] - Trade.AvgPrice)/2 + Trade.AvgPrice));                             // Sonderfall: nach auslösen des Stopp Sperre bis neuem, gültigen Stopp
                 
-                if (Stopp > Trade.AvgPrice)
-                    Limit = Math.Max(((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice - _abstand * TickSize), (Stopp - _ATR_Faktor * ATR(14)[0]));     // Limit auf die Hälfte des Gewinns bzw unter Stopp - 1,5 x ATR
-                else
-                    Limit = Stopp - _ATR_Faktor * ATR(14)[0] - _abstand * TickSize;     // Limit auf die Hälfte des Gewinns bzw unter Stopp - 1,5 x ATR
-                if (!_stopLimit) Limit = Stopp;
-                dStopp[0] = Stopp;
+                
 
+                if (Stopp > 0)
+                {
+                    Stopp = (int)(10 * Stopp);
+                    Stopp = Stopp / 10;
+                    dStopp[0] = Stopp;
+
+                    if(_stopLimit)
+                    { 
+                        if (Stopp > Trade.AvgPrice)
+                        { 
+                            Limit = (int)(Instrument.Round2TickSize(Math.Max(((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice - _abstand * TickSize), (Stopp - _ATR_Faktor * ATR(14)[0]))))*10;     // Limit auf die Hälfte des Gewinns bzw unter Stopp - 1,5 x ATR
+                            Limit = Limit / 10;
+                        }
+                        else
+                        { 
+                            Limit = (int)(Instrument.Round2TickSize(Stopp - _ATR_Faktor * ATR(14)[0] - _abstand * TickSize))*10;     // Limit auf die Hälfte des Gewinns bzw unter Stopp - 1,5 x ATR
+                            Limit = Limit / 10;
+                        }
+                    }
+                }
                 #endregion Trend-Stopp-Berechnung
 
-    
+
 
                 #region Vollkasko
-
-                if (TotalSchutz) // 1 Trend-Hardstopp für Gesamtposition setzen, wenn Position Stopp über Profit liegt
-                {
-                    if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
-                        (!_profitOnly || (_profitOnly && (Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)))))
-                    {
+                if (Stopp > 0)
+                { 
+                    if (TotalSchutz) // 1 Trend-Hardstopp für Gesamtposition setzen, wenn Position Stopp über Profit liegt
+                        {
+                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                            (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                        {
                         if (_stopLimit)
-                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Trade.Quantity, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Stopp), "Stopp T", TStopp);
+                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp T", TStopp);
                         else
-                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Trade.Quantity, 0, Instrument.Round2TickSize(Stopp), "Stopp T", TStopp);
+                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp T", TStopp);
                         if (_automatisch) oTStop.ConfirmOrder();
+                        }
+
                     }
-
-                }
-                else // 1 Trend-Hardstopp für Teilposition setzen, wenn Position Stopp über Profit liegt
-                {
-                    if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
-                        (!_profitOnly || (_profitOnly && (Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)))))
+                    else // 1 Trend-Hardstopp für Teilposition setzen, wenn Position Stopp über Profit liegt
                     {
-                        if (_stopLimit)
-                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Stopp), "Stopp B" + _trend, TStopp);
-                        else
-                            oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Instrument.Round2TickSize(Stopp), "Stopp B", TStopp);
+                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                            (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                        {
+                            if (_stopLimit)
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Stopp), "Stopp B" + _trend, TStopp);
+                            else
+                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Instrument.Round2TickSize(Stopp), "Stopp B", TStopp);
+                               
+                            if (_automatisch) oTStop.ConfirmOrder();
 
-                        if (_automatisch) oTStop.ConfirmOrder();
-
+                        }
                     }
                 }
                 #endregion Vollkasko
 
                 #region Softstopp
-                if(_softstopp && Close[0] < dStopp[1])
-                {
-                    Stopp = Close[0] - _abstand * TickSize;
-                    Limit = Math.Max(((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice - _abstand * TickSize), (Stopp - _ATR_Faktor * ATR(14)[0]));
-                    if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
-                        oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                if(Stopp > 0)
+                { 
+                    if (_softstopp && Close[0] < dStopp[1])
                     {
-                        if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                        else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                        Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
+                        Limit = Instrument.Round2TickSize(Math.Max(((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice - _abstand * TickSize), (Stopp - _ATR_Faktor * ATR(14)[0])));
+                        if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                            oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                        {
+                            if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                            else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                        }
                     }
                 }
-
                 #endregion Softstopp
 
                 #region Hardstopp
-                if(oTStop != null)
+                if (Stopp > 0 && oTStop != null)
                 {
                     if ((oTStop.StopPrice < Stopp && !_softstopp) || (Stopp > oTStop.StopPrice && oTStop.StopPrice < Trade.AvgPrice))
                     {
                         if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
                             oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
                         {
-                            if(Stopp > (1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize && oTStop.StopPrice < Trade.AvgPrice && TotalSchutz)    // 1. Stopp einmalig in den Gewinn ziehen.
+                            if(Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)) && oTStop.StopPrice < Trade.AvgPrice && TotalSchutz)    // 1. Stopp einmalig in den Gewinn ziehen.
                             {
                                 if (_stopLimit) ReplaceOrder(oTStop, Trade.Quantity, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                                else ReplaceOrder(oTStop, Trade.Quantity, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                else ReplaceOrder(oTStop, Trade.Quantity, 0, ( (int)(10 * Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp))/10)));
                             }
                             else
                             { 
