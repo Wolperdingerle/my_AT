@@ -12,7 +12,7 @@ using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
 
 /// <summary>
-/// Version: 1.2.2
+/// Version: 1.2.3
 /// -------------------------------------------------------------------------
 /// Simon Pucher 2016
 /// Christian Kovar 2016
@@ -28,7 +28,7 @@ using AgenaTrader.Helper;
 namespace AgenaTrader.UserCode
 {
     [Description("Basic indicator example for SMA crossover")]
-    public class Example_Strategy_SMA_CrossOver_Advanced1 : UserStrategy
+    public class Example_Strategy_SMA_CrossOver_Advanced : UserStrategy
     {
 
         //input
@@ -41,7 +41,7 @@ namespace AgenaTrader.UserCode
         //output
 
         //internal
-        private Example_Indicator_SMA_CrossOver_Advanced _Example_Indicator_SMA_CrossOver_Advanced = null;
+       // private Example_Indicator_SMA_CrossOver_Advanced _Example_Indicator_SMA_CrossOver_Advanced = null;
         private IOrder _orderenterlong;
         private IOrder _orderentershort;
 
@@ -132,8 +132,8 @@ namespace AgenaTrader.UserCode
         {
             if (_orderenterlong == null)
             {
-                _orderenterlong = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
-                
+                //_orderenterlong = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
+                _orderenterlong = SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName = this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.ToString(), Instrument = this.Instrument, TimeFrame = this.TimeFrame });
                 //set a stop loss for our order. we set it 1% below the current price
                 SetUpStopLoss(_orderenterlong.Name, CalculationMode.Price, Bars[0].Close * 0.99, false);
 
@@ -149,8 +149,8 @@ namespace AgenaTrader.UserCode
         {
             if (_orderentershort == null)
             {
-                _orderentershort = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
-
+                //_orderentershort = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
+                _orderentershort = SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName = this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), Instrument = this.Instrument, TimeFrame = this.TimeFrame });
                 //set a stop loss for our order. we set it 1% above the current price
                 SetUpStopLoss(_orderentershort.Name, CalculationMode.Price, Bars[0].Close * 1.01, false);
 
@@ -166,8 +166,9 @@ namespace AgenaTrader.UserCode
         {
             if (_orderenterlong != null)
             {
-                 CloseLongTrade(new StrategyOrderParameters {Type = OrderType.Market, Quantity = this._orderenterlong.Name});
-                 this._orderenterlong = null;
+                //SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this._orderenterlong.Name});
+                SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this._orderenterlong.Quantity });
+                this._orderenterlong = null;
             }
         }
 
@@ -178,8 +179,10 @@ namespace AgenaTrader.UserCode
         {
             if (_orderentershort != null)
             {
-                CloseShortTrade(new StrategyOrderParameters {Type = OrderType.Market, Quantity = this._orderentershort.Name});
+                //SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this._orderentershort.Name});
+                SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this._orderentershort.Quantity });
                 this._orderentershort = null;
+
             }
         }
 
@@ -207,7 +210,7 @@ namespace AgenaTrader.UserCode
         #region Properties
 
 
-        #region InSeries
+        #region Input
 
         /// <summary>
         /// </summary>

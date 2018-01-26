@@ -1,0 +1,15 @@
+public class ResultValue_Indicator_TrendStopp
+{
+    public bool ErrorOccured = false;
+    public double Hard_Stopp = 0.0;
+    public double Soft_Stopp = 0.0;
+    public double Limit = 0.0;
+}
+
+public ResultValue_Indicator_TrendStopp calculate(IDataSeries data, int Trend, int Abstand, bool StopLimit, bool ProfitOnly) 
+{
+/*
+* Here we do all the smart work and in the end we return our result object.
+* So the calling scripts knows what to do (e.g. a strategy will create an order in the market, the condition will create a signal, and so on).
+*/
+}

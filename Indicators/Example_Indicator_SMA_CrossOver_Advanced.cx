@@ -12,7 +12,7 @@ using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
 
 /// <summary>
-/// Version: 1.2.2
+/// Version: 1.2.3
 /// -------------------------------------------------------------------------
 /// Simon Pucher 2016
 /// Christian Kovar 2016
@@ -44,7 +44,7 @@ namespace AgenaTrader.UserCode
     [Description("Basic indicator example for SMA crossover")]
     public class Example_Indicator_SMA_CrossOver_Advanced : UserIndicator
     {
-
+        #region Variable
         //input
         private Color _plot0color = Color.Blue;
         private int _plot0width = 2;
@@ -56,12 +56,14 @@ namespace AgenaTrader.UserCode
         private bool _IsShortEnabled = true;
         private int _fastsma = 20;
         private int _slowsma = 50;
+        private int _trend = 1;
+        private int _abstand = 2;
 
 
         //output
 
         //internal
-
+        #endregion Variable
 
         /// <summary>
         /// This method is used to configure the indicator and is called once before any bar data is loaded.
@@ -69,18 +71,18 @@ namespace AgenaTrader.UserCode
         protected override void OnInit()
         {
             //Define the plots and its color which is displayed underneath the chart
-            Add(new OutputDescriptor(this.Plot0Color, "SMA_CrossOver_Entry"));
-            Add(new OutputDescriptor(this.Plot1Color, "SMA_CrossOver_Exit"));
+            Add(new OutputDescriptor(this.Plot0Color, "Hard-Stopp"));
+            Add(new OutputDescriptor(this.Plot1Color, "Soft-Stopp"));
 
             //Define if the OnBarUpdate method should be triggered only on BarClose (=end of period)
             //or with each price update
             CalculateOnClosedBar = true;
 
             //Indicator should be drawn on the price panel
-            IsOverlay = true;
+            this.IsOverlay = true;
 
             //Because of backtesting reasons if we use the advanced mode we need at least two bars!
-			//In this case we are using SMA50, so we need at least 50 bars.
+            //In this case we are using SMA50, so we need at least 50 bars.
             this.RequiredBarsCount = 50;
         }
 
@@ -109,8 +111,8 @@ namespace AgenaTrader.UserCode
             }
 
             //Set the curve data for the chart drawing
-            this.Indicator_Curve_Fast.Set(returnvalue.Fast);
-            this.Indicator_Curve_Slow.Set(returnvalue.Slow);
+            this.Hard_Stopp.Set(returnvalue.Fast);
+            this.Soft_Stopp.Set(returnvalue.Slow);
 
             //Entry
             if (returnvalue.Entry.HasValue)
@@ -133,10 +135,10 @@ namespace AgenaTrader.UserCode
             //    switch (returnvalue.Exit)
             //    {
             //        case OrderDirection.Buy:
-            //            AddChartDiamond("ArrowShort_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
+            //            DrawDiamond("ArrowShort_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
             //            break;
             //        case OrderDirection.Sell:
-            //            AddChartDot("ArrowLong_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
+            //            DrawDot("ArrowLong_Exit" + Bars[0].Time.Ticks, true, Bars[0].Time, Bars[0].Open, Color.Orange);
             //            break;
             //    }
             //}
@@ -256,7 +258,7 @@ namespace AgenaTrader.UserCode
 
 
 
-        #region InSeries
+        #region Input
 
 
         /// <summary>
@@ -395,14 +397,14 @@ namespace AgenaTrader.UserCode
 
         [Browsable(false)]
             [XmlIgnore()]
-            public DataSeries Indicator_Curve_Fast
+            public DataSeries Hard_Stopp
             {
                 get { return Outputs[0]; }
             }
 
             [Browsable(false)]
             [XmlIgnore()]
-            public DataSeries Indicator_Curve_Slow
+            public DataSeries Soft_Stopp
             {
                 get { return Outputs[1]; }
             }
