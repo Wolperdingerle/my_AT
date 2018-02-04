@@ -13,185 +13,151 @@ using AgenaTrader.Helper;
 
 namespace AgenaTrader.UserCode
 {
-
+    
     /// <summary>
     /// Class which holds all important data like the OrderDirection. 
     /// We use this object as a global default return object for the calculate method in indicators.
     /// </summary>
-    public class ResultValue_Indicator_Trend_Stopp
+    public class ResultValue_Trend_Stopp
     {
         public bool ErrorOccured = false;
-        public bool _StoppLimit = true;
-        public bool _ProfitOnly = true;
-        public int _Trend;
-        public double _Hard_Stopp = 0.0;
-        public double _Soft_Stopp = 0.0;
-        public double _Limit = 0.0;
+        public double HStopp = 0.0;
+        public double SStopp = 0.0;
+        public double Limit = 0.0;
+        //public int Trend = 2;
+        //public int Abstand = 2;
     }
-
+    
+    [Description("Basic indicator Trend-Stopp")]
     public class Trend_Stopp_I : UserIndicator
-    {
-        #region Variable
+	{
+        #region Variable für die Plots
         //input
+        //input Eigenschafte der Plots
+        // Hardstopp
         private Color _plot0color = Color.Red;
         private int _plot0width = 2;
         private DashStyle _plot0dashstyle = DashStyle.Solid;
-        private Color _plot1color = Color.OrangeRed;
+
+        // Softstopp
+        private Color _plot1color = Color.Blue;
         private int _plot1width = 2;
         private DashStyle _plot1dashstyle = DashStyle.Dash;
-        private Color _plot2color = Color.Blue;
+
+        // Limit
+        private Color _plot2color = Color.DodgerBlue;
         private int _plot2width = 2;
         private DashStyle _plot2dashstyle = DashStyle.DashDot;
-        private bool _IsLongEnabled = true;
-        private bool _IsShortEnabled = true;
-        private double _Hard_Stopp = 0.0;
-        private double _Soft_Stopp = 0.0;
-        private double _Limit = 0.0;
+        // intern
+        private int stueck;
+        private DateTime startZeit;
+
+        #endregion Variable
         
 
-        //output
-
-        private double Stopp = 0.0;
-        private int _trend =2;
-        private int _abstand = 2;
-        private double _limit = 0.0;
-        private IDataSeries Hard_Stopp;
-        private IDataSeries Soft_Stopp;
-        private IDataSeries Limit;
-        private int Teilverkauf = 0;
-        #endregion Variable
-
         protected override void OnInit()
-        {
-            //Define the plots and its color which is displayed underneath the chart
-            Add(new OutputDescriptor(this.Plot0Color, "Hard_Stopp"));
-            Add(new OutputDescriptor(this.Plot1Color, "Soft_Stopp"));
-            Add(new OutputDescriptor(this.Plot2Color, "Limit"));
-
-            // AddOutput(new OutputDescriptor(Color.FromKnownColor(KnownColor.DarkRed), OutputSerieDrawStyle.TriangleDown, "Soft_Stopp"));
+		{
+            //Define the plots and its color which is displayed in the chart
+            Add(new OutputDescriptor(Plot0Color, "Hard_Stopp"));
+            Add(new OutputDescriptor(Plot1Color, "Soft_Stopp"));
+            Add(new OutputDescriptor(Plot2Color, "Limit"));
+            RequiredBarsCount = 10;
             IsOverlay = true;
-            Hard_Stopp = new DataSeries(this);
-            Soft_Stopp = new DataSeries(this);
-            Limit = new DataSeries(this);
+            
         }
 
-
-        protected override void OnCalculate()
-        {
-
+		protected override void OnCalculate()
+		{
+            if (TradeInfo == null || (TradeInfo != null && (TradeInfo.Quantity == 0) )) return;     // kein Trade offen
+            #region Timeframe
             //Check if peridocity is valid for this script
             if (!DatafeedPeriodicityIsValid(Bars.TimeFrame))
             {
-                Log(this.DisplayName + ": Periodicity of your data feed is suboptimal for this indicator!", InfoLogLevel.AlertLog);
+                Log(this.DisplayName + ": Zeitbasierter Chart erforderlich!", InfoLogLevel.AlertLog);
                 return;
             }
+            #endregion Timeframe
+            
+            if(TradeInfo.Quantity != stueck)   // Kauf oder Teilverkauf hat stattgefunden
+            {
+                stueck = TradeInfo.Quantity;
+                startZeit = Bars[0].Time;
+                _stopp = 0;
+            }
+
+            #region Trend-Stopp-Berechnung: 
+            if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
+                _stopp = Instrument.Round2TickSize(Math.Max(_stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize)));       //im Aufwärtstrend: P3 gültig
+            else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])
+                _stopp = Instrument.Round2TickSize(Math.Max(_stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize));            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
+            else if (P123Adv(_trend).P2Price[0] < P123Adv(_trend).P1Price[0] && P123Adv(_trend).TempP3DateTime[0] > P123Adv(_trend).P2DateTime[0]
+                   && P123Adv(_trend).P2DateTime[0] < P123Adv(_trend).TempP3DateTime[0])
+                _stopp = Instrument.Round2TickSize(Math.Max(_stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärstrend: TempP3 gültig, Stopp am letzten P2
+            else if (TradeInfo != null && P123Adv(_trend).P2DateTime[0] < startZeit)
+                _stopp = Instrument.Round2TickSize(Math.Max(_stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: P2 vor Kauf, Stopp am gültigen P2
+            #endregion
+            
+            // zeige die Werte nur an, wenn > 0
+            // nur zum Test
+
+
+            //if (_hstopp > 0) Hard_Stopp.Set(_hstopp);   // zeigt Verlauf Hardstopp
+            if (_stopp > 0) Soft_Stopp.Set(_stopp);     // zeigt Verlauf Softstopp
+            //if (_limit > 0) Limit.Set(_limit);          // zeigt bei Stop-Limit-Order den Limit-Preis
 
             //Lets call the calculate method and save the result with the trade action
-            ResultValue_Indicator_Trend_Stopp returnvalue = this.calculate(this.InSeries, this._trend, this._abstand, this._Hard_Stopp);
+            ResultValue_Trend_Stopp returnvalue = ResultValue_Trend_Stopp.calculate(InSeries, Trend, Abstand, Hard_Stopp, Soft_Stopp, Limit);
 
             //If the calculate method was not finished we need to stop and show an alert message to the user.
+            
             if (returnvalue.ErrorOccured)
             {
                 Log(this.DisplayName + ": A problem has occured during the calculation method!", InfoLogLevel.AlertLog);
                 return;
             }
+            
 
 
-            if (TradeInfo == null)
-                return;
-            else
-            {
-                if (Teilverkauf == 0) Teilverkauf = TradeInfo.Quantity;
-                // #region Trend-Stopp-Berechnung: 
-
-                if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize));       //im Aufwärtstrend: P3 gültig
-                else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize);            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
-                else if (P123Adv(_trend).P2Price[0] < P123Adv(_trend).P1Price[0] && P123Adv(_trend).TempP3DateTime[0] > P123Adv(_trend).P2DateTime[0]
-                       && P123Adv(_trend).P2DateTime[0] < P123Adv(_trend).TempP3DateTime[0])
-                    Stopp = Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize);           //im Abwärtstrend: TempP3 gältig, Stopp am letztenP2
-
-                if (Teilverkauf > 0 && Teilverkauf != TradeInfo.Quantity)
-                {
-                    Stopp = Instrument.Round2TickSize((Close[0] - TradeInfo.AvgPrice) / 2 + TradeInfo.AvgPrice);
-                    Teilverkauf = TradeInfo.Quantity;
-                }
-                else Stopp = Instrument.Round2TickSize(Stopp);
-                if (Stopp > 0)
-                {
-                    Outputs[0][0] = Stopp;  // Hard-Stopp
-                    //if(_Limit > 0)
-                        Outputs[1][0] = Stopp -0.5;   // Soft_Stopp
-                    //if(_Limit > 0)
-                        Outputs[2][0] = Stopp - 1 ;
-                }
-                //   #endregion Trend-Stopp-Berechnung
-            }
-
-            #region Ploteigenschaften
+            #region Ploteinstellungen ändern
             //Set the drawing style, if the user has changed it.
             PlotColors[0][0] = this.Plot0Color;
             OutputDescriptors[0].PenStyle = this.Dash0Style;
             OutputDescriptors[0].Pen.Width = this.Plot0Width;
-            PlotColors[0][1] = this.Plot1Color;
+            PlotColors[1][0] = this.Plot1Color;
             OutputDescriptors[1].PenStyle = this.Dash1Style;
             OutputDescriptors[1].Pen.Width = this.Plot1Width;
-            PlotColors[0][2] = this.Plot1Color;
-            OutputDescriptors[2].PenStyle = Dash2Style;
+            PlotColors[2][0] = this.Plot2Color;
+            OutputDescriptors[2].PenStyle = this.Dash2Style;
             OutputDescriptors[2].Pen.Width = this.Plot2Width;
-            #endregion Ploteigenschaften
+            #endregion
         }
-
+        
         /// <summary>
-        /// In this method we do all the work and return the object with all data like the OrderActions.
-        /// This method can be called from any other script like strategies, indicators or conditions.
-        /// Aufruf mit meinen Parametern
+        /// Calculate Methode Resultvalue_Indicator_Trend_Stopp; Rückgabe: Objekt resultvalue
         /// </summary>
         /// <param name="data"></param>
+        /// <param name="Trend"></param>
+        /// <param name="Abstand"></param>
+        /// <param name="Hard_Stopp"></param>
+        /// <param name="Soft_Stopp"></param>
+        /// <param name="Limit"></param>
         /// <returns></returns>
-        public ResultValue_Indicator_Trend_Stopp calculate(IDataSeries data, int _Trend, int _Abstand, double Stopp)
+        /// 
+
+        public static ResultValue_Trend_Stopp calculate(IDataSeries data, int Trend, int Abstand, IDataSeries Hard_Stopp, IDataSeries Soft_Stopp, IDataSeries Limit)
         {
             //Create a return object
-            ResultValue_Indicator_Trend_Stopp returnvalue = new ResultValue_Indicator_Trend_Stopp();
+            Trend_Stopp_I returnvalue = new Trend_Stopp_I();
 
             //try catch block with all calculations
             try
             {
                 //Calculate SMA and set the data into the result object
-                returnvalue._Hard_Stopp = Outputs[0][0];
-                returnvalue._Soft_Stopp = Outputs[1][0];
-                returnvalue._Limit = Outputs[2][0];
+        
+                returnvalue.HStopp = Hard_Stopp[0];
+                returnvalue.SStopp = Soft_Stopp[0];
+                returnvalue.Limit = Limit[0];
 
-                /*
-                 * CrossAbove: We create buy (entry) signal for the long position and BuyToCover (exit) for the short position.
-                 * CrossBelow: We create sell (exit) signal for the long positon and SellShort (entry) for the short position.
-                 */
-                 /*
-                if (CrossAbove(SMA(data, fastsma), SMA(data, slowsma), 0) == true)
-                {
-                    if (islongenabled)
-                    {
-                        returnvalue.Entry = OrderDirection.Buy;
-                    }
-                    if (isshortenabled)
-                    {
-                        returnvalue.Exit = OrderDirection.Buy;
-                    }
-
-                }
-                else if (CrossBelow(SMA(data, fastsma), SMA(data, slowsma), 0) == true)
-                {
-                    if (islongenabled)
-                    {
-                        returnvalue.Exit = OrderDirection.Sell;
-                    }
-                    if (isshortenabled)
-                    {
-                        returnvalue.Entry = OrderDirection.Sell;
-                    }
-                }
-                */
             }
             catch (Exception)
             {
@@ -202,32 +168,84 @@ namespace AgenaTrader.UserCode
             //return the result object
             return returnvalue;
         }
-
+        
 
         #region Properties
-
-
-        [Description("Trendgrösse (0 -3)")]
-        [Category("Parameters")]
-        public int Trend
-        {
-            get { return _trend; }
-            set { _trend = Math.Min(3, Math.Max(value, 0)); }
-        }
-
-/*
+        // Beginn Qutput
         [Browsable(false)]
-        [XmlIgnore()]
-        public DataSeries Soft_Stopp
-        {
-            get { return Outputs[1]; }
+		[XmlIgnore()]
+		public DataSeries Hard_Stopp
+		{
+			get { return Outputs[0]; }
+           // set { Hard_Stopp[0] = value[0]; }       // eiggefügt Schreiben in Hardstopp
         }
-*/
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Soft_Stopp
+		{
+			get { return Outputs[1]; }
+           // set { Soft_Stopp[0] = value[0]; }       // eiggefügt Schreiben in Softstopp
+        }
+
+		[Browsable(false)]
+		[XmlIgnore()]
+		public DataSeries Limit
+		{
+			get { return Outputs[2]; }
+		}
+        // Ende Qutput
+        // Begiunn Input-Parameter
+
+        [InputParameter]
+		public int Trend
+		{
+			get { return _trend; }
+			set { _trend = Math.Max(0, value); }
+		}
+		private int _trend = 2;
+
+		[InputParameter]
+		public int Abstand
+		{
+			get { return _abstand; }
+			set { _abstand = Math.Max(0, value); }
+		}
+		private int _abstand =2;
+
+        //      [Sonstiges]
+        public double Stopp
+        {
+            get { return _stopp; }
+            set { _stopp = value;}
+        }
+        private double _stopp;
+        // Ende Input-Parameter
+
+
+  //      [Sonstiges]
+        public double HStopp
+        {
+            get { return _hstopp; }
+            set { _hstopp = value; }
+        }
+        private double _hstopp;
+
+
+        //      [Sonstiges]
+        public double Limitd
+        {
+            get { return _limit; }
+            set { _limit = value; }
+        }
+        private double _limit;
+        // Ende Input-Parameter
 
         /// <summary>
         /// defines display name of indicator (e.g. in AgenaTrader chart window)
         /// </summary>
         /// <returns></returns>
+        
         public override string ToString()
         {
             return "Trend_Stopp (I)";
@@ -244,7 +262,7 @@ namespace AgenaTrader.UserCode
             }
         }
 
-
+    
         /// <summary>
         /// True if the periodicity of the data feed is correct for this indicator.
         /// </summary>
@@ -262,14 +280,6 @@ namespace AgenaTrader.UserCode
             }
         }
 
-
-        #region Properties
-
-
-
-        #region InSeries
-
-      
         /// <summary>
         /// </summary>
         [Description("Select Color für Hard-Stopp.")]
@@ -375,7 +385,7 @@ namespace AgenaTrader.UserCode
         [DisplayName("Linenbreite Limit")]
         public int Plot2Width
         {
-            get { return _plot1width; }
+            get { return _plot2width; }
             set { _plot2width = Math.Max(1, value); }
         }
 
@@ -389,55 +399,6 @@ namespace AgenaTrader.UserCode
             get { return _plot2dashstyle; }
             set { _plot2dashstyle = value; }
         }
-
-        #endregion
-
-
-        #region Output
-
-        [Browsable(false)]
-        [XmlIgnore()]
-        public DataSeries Indikator_Hard_Stopp
-        {
-            get { return Outputs[0]; }
-        }
-
-        [Browsable(false)]
-        [XmlIgnore()]
-        public DataSeries Indikator_Soft_Stopp
-        {
-            get { return Outputs[1]; }
-        }
-
-        [Browsable(false)]
-        [XmlIgnore()]
-        public DataSeries Indikator_Limit
-        {
-            get { return Outputs[2]; }
-        }
-
-        /*
-                [Browsable(false)]
-                [XmlIgnore()]
-                public DataSeries Indicator_Curve_Fast
-                {
-                    get { return Outputs[0]; }
-                }
-
-                [Browsable(false)]
-                [XmlIgnore()]
-                public DataSeries Indicator_Curve_Slow
-                {
-                    get { return Outputs[1]; }
-                }
-        */
-        #endregion
-
-
-
-
-        #endregion
-
 
 
         #endregion

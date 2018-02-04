@@ -75,11 +75,7 @@ namespace AgenaTrader.UserCode
             {
                 if(Order.LimitPrice > 0 && Order.Quantity != (int)(_kapital / Order.LimitPrice) + 1)
                 {
-                    LimitPreis = (int)(Order.LimitPrice * 10);
-                    LimitPreis = LimitPreis / 10;
-                    //ReplaceOrder(Order, (int)(_kapital / Order.LimitPrice) + 1, Instrument.Round2TickSize(Order.LimitPrice) , 0);
-                    ReplaceOrder(Order, (int)(_kapital / Order.LimitPrice) + 1, LimitPreis, 0);
-
+                    ReplaceOrder(Order, (int)(_kapital / Order.LimitPrice) + 1, Instrument.Round2TickSize(Order.LimitPrice) , 0);
                 }
                 if (Chart != null) AddChartTextFixed("MyText", "Limit-Kauf für ca. " + (EnterOrder.Quantity * EnterOrder.LimitPrice).ToString("F0") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
 
@@ -105,11 +101,7 @@ namespace AgenaTrader.UserCode
 
             if (EnterOrder == null)
             {
-             
                 LimitPreis = Instrument.Round2TickSize(Close[0] *0.985); // Limitpries 1,5% unter letztem Kurs10; // Limitpries 1,5% unter letztem Kurs
-                                                                         // LimitPreis = Instrument.Round2TickSize(Close[0] *0.985); // Limitpries 1,5% unter letztem Kurs
-                LimitPreis = (int)(LimitPreis * 10);
-                LimitPreis = LimitPreis / 10;
                 EnterOrder = SubmitOrder(0, OrderDirection.Buy, OrderType.Limit, (int)((_kapital / LimitPreis) + 1), LimitPreis, 0, orderName, orderName);
             }
             else

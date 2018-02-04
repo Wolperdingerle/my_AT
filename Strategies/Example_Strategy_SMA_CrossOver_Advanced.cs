@@ -41,7 +41,7 @@ namespace AgenaTrader.UserCode
         //output
 
         //internal
-       // private Example_Indicator_SMA_CrossOver_Advanced _Example_Indicator_SMA_CrossOver_Advanced = null;
+        private Example_Indicator_SMA_CrossOver_Advanced _Example_Indicator_SMA_CrossOver_Advanced = null;
         private IOrder _orderenterlong;
         private IOrder _orderentershort;
 

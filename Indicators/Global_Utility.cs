@@ -518,6 +518,8 @@ namespace AgenaTrader.UserCode
             return HighestHigh;
         }
 
+     
+
         /// <summary>
         /// LowestLow Method is not available in Conditions, therefore this alternative can be used
         /// </summary>
