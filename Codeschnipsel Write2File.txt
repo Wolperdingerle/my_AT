@@ -1,0 +1,100 @@
+ Hot Mod
+	
+
+Hot Mod
+
+03.02.2013
+	
+
+Im Anhang ein kleines Beispiel wie man z.B. Die OHLC Historie eines Instruments raus-dumped - soll natürlich auf die speziellen Bedürfnisse angepasst werden
+
+zum NT Code Bars.GetDayBar(int tradingdaysback).Close
+
+Verwenden Sie bitte in AT: Bars[0].Close
+
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
+using System.IO;
+using AgenaTrader.API;
+using AgenaTrader.Custom;
+using AgenaTrader.Plugins;
+using AgenaTrader.Helper;
+
+namespace AgenaTrader.UserCode
+{
+    [Description("Read the OHLC-History of an onstrument")]
+    public class OHLCHistory : UserIndicator
+    {
+
+    # region Variables
+
+    string _path = string.Empty;
+    string _file = string.Empty;
+
+
+    # endregion
+
+    protected override void Initialize()
+{
+
+        if (Instrument == null)
+            return;
+
+        _path = this.ApiManager.Core.Settings.BaseApplicationSettingsDir + "\\Privat";
+        _file = _path + "\\OHLC_" + Instrument.Symbol + "_" + TimeFrame.ToString() + ".csv";
+        CalculateOnBarClose = true;
+}
+
+protected override void OnBarUpdate()
+{
+    if ( CurrentBar == Bars.Count - 1)
+    {
+            string allLines = RetrieveHistory();
+
+            string line = Instrument.Symbol + ";"
+                    + Time[1].ToString("dd.MM.yyyy") + ";"
+                    + Open[1].ToString("0.0000") + ";"
+                    + High[1].ToString("0.0000") + ";"
+                    + Low[1].ToString("0.0000") + ";"
+                    + Close[1].ToString("0.0000") + ";" + Volume[1];
+
+                   if (!allLines.Contains(line))
+                   {
+                           allLines += "\r\n" + line;
+                           File.WriteAllText(_file, allLines);
+                    }
+    }
+}
+
+    private string RetrieveHistory()
+    {
+        if (!Directory.Exists(_path))
+            Directory.CreateDirectory(_path);
+
+        if (!File.Exists(_file))
+        {
+            string lines = string.Empty;
+            for (int index = Bars.Count - 1; index >= 0; index--)
+            {
+                lines += Instrument.Symbol + ";"
+                    + Time[index].ToString("dd.MM.yyyy") + ";"
+                    + Open[index].ToString("0.0000") + ";"
+                    + High[index].ToString("0.0000") + ";"
+                    + Low[index].ToString("0.0000") + ";"
+                    + Close[index].ToString("0.0000") + ";" + Volume[index] + "\r\n";
+            }
+            lines = lines.Substring(0, lines.Length - 2);
+            File.WriteAllText(_file, lines);
+        }
+        return File.ReadAllText(_file);
+    }
+
+
+}
+}

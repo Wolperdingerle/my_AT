@@ -118,7 +118,7 @@ namespace AgenaTrader.UserCode
         #region Properties
 
         [Description("Kapital für diese Order")]
-		[Category("Parameters")]
+		[InputParameter]
 		public double Kapital
 		{
 			get { return _kapital; }

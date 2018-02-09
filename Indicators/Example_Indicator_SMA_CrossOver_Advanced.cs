@@ -264,7 +264,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("The period of the fast SMA indicator.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Period fast")]
         public int FastSma
         {
@@ -276,7 +276,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("The period of the slow SMA indicator.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Period slow")]
         public int SlowSma
         {
@@ -288,7 +288,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("If true it is allowed to create long positions.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Allow Long")]
         public bool IsLongEnabled
         {
@@ -300,7 +300,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("If true it is allowed to create short positions.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Allow Short")]
         public bool IsShortEnabled
         {

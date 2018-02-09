@@ -132,7 +132,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderenterlong == null)
             {
-                //_orderenterlong = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
+                //_orderenterlong = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
                 _orderenterlong = SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Buy, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName = this.DisplayName + "_" + OrderDirection.Buy + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.ToString(), Instrument = this.Instrument, TimeFrame = this.TimeFrame });
                 //set a stop loss for our order. we set it 1% below the current price
                 SetUpStopLoss(_orderenterlong.Name, CalculationMode.Price, Bars[0].Close * 0.99, false);
@@ -149,7 +149,7 @@ namespace AgenaTrader.UserCode
         {
             if (_orderentershort == null)
             {
-                //_orderentershort = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Timestamp.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
+                //_orderentershort = SubmitOrder(new StrategyOrderParameters {Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName =  this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), Instrument =  this.Instrument, TimeFrame =  this.TimeFrame});
                 _orderentershort = SubmitOrder(new StrategyOrderParameters { Direction = OrderDirection.Sell, Type = OrderType.Market, Quantity = this.DefaultOrderQuantity, SignalName = this.DisplayName + "_" + OrderDirection.Sell + "_" + this.Instrument.Symbol + "_" + Bars[0].Time.Ticks.ToString(), Instrument = this.Instrument, TimeFrame = this.TimeFrame });
                 //set a stop loss for our order. we set it 1% above the current price
                 SetUpStopLoss(_orderentershort.Name, CalculationMode.Price, Bars[0].Close * 1.01, false);
@@ -215,7 +215,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("The period of the fast SMA indicator.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Period fast")]
         public int FastSma
         {
@@ -227,7 +227,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("The period of the slow SMA indicator.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Period slow")]
         public int SlowSma
         {
@@ -247,7 +247,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("If true it is allowed to create long positions.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Allow Long")]
         public bool IsLongEnabled
         {
@@ -259,7 +259,7 @@ namespace AgenaTrader.UserCode
         /// <summary>
         /// </summary>
         [Description("If true it is allowed to create short positions.")]
-        [Category("Parameters")]
+        [InputParameter]
         [DisplayName("Allow Short")]
         public bool IsShortEnabled
         {

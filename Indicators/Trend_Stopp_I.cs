@@ -19,43 +19,38 @@ namespace AgenaTrader.UserCode
     public class Trend_Stopp : UserIndicator
 	{
         #region Variable für die Plots
-        //input
-        //input Eigenschafte der Plots
-        // Softstopp
         private Color _plot0color = Color.Blue;
         private int _plot0width = 2;
         private DashStyle _plot0dashstyle = DashStyle.Dash;
-
-        // intern
+        #endregion für die Plots
+        #region interne Variable
         private int _trend = 1;
         private int _abstand = 2;
         private int stueck;
-        private int _BarsRequired = 500;
         private DateTime startZeit;
         private double _stopp = 0;
+        private bool _neuStart = false;
 
-
-        #endregion Variable
+        #endregion interne Variable
         
 
         protected override void OnInit()
 		{
             //Define the plots and its color which is displayed in the chart
             Add(new OutputDescriptor(Plot0Color, "Soft_Stopp"));
-            RequiredBarsCount = RequiredBarsCount;
+            RequiredBarsCount = Math.Max(3,RequiredBarsCount);
             IsOverlay = true;
-            if (TradeInfo != null && TradeInfo.Quantity > 0 && stueck == 0)
+            if (TradeInfo != null && TradeInfo.Quantity != 0)
             {
                 stueck = TradeInfo.Quantity;
                 startZeit = TradeInfo.CreatedDateTime;
-                _stopp = 0;
             }
             
         }
 
 		protected override void OnCalculate()
 		{
-            if (TradeInfo == null || (TradeInfo != null && TradeInfo.Quantity == 0 )) return;     // kein Trade offen, nur letzten Bar berechnen
+            if (!IsProcessingBarIndexLast || TradeInfo == null || (TradeInfo != null && TradeInfo.Quantity == 0 )) return;     // kein Trade offen, nur letzten Bar berechnen
             #region Timeframe
             //Check if peridocity is valid for this script
             if (!DatafeedPeriodicityIsValid(Bars.TimeFrame))
@@ -64,14 +59,22 @@ namespace AgenaTrader.UserCode
                 return;
             }
             #endregion Timeframe
-            
-            if(TradeInfo.Quantity != stueck)   // Kauf oder Teilverkauf hat stattgefunden
+
+            if (_neuStart && IsProcessingBarIndexLast)
+            {
+                startZeit = Bars[1].Time;
+                _neuStart = false;
+                _stopp = 0;
+                return;
+            }
+
+            if (TradeInfo.Quantity != stueck)   // Kauf oder Teilverkauf hat stattgefunden
             {
                 stueck = TradeInfo.Quantity;
                 startZeit = Bars[0].Time;
                 _stopp = 0;
             }
-
+            
             #region Trend-Stopp-Berechnung: Starte ab dem 2. Bar nach Tradeeröffung
             if (Bars[1] != null && Bars[1].Time > startZeit)
             {
@@ -97,8 +100,9 @@ namespace AgenaTrader.UserCode
             PlotColors[0][0] = this.Plot0Color;
             OutputDescriptors[0].PenStyle = this.Dash0Style;
             OutputDescriptors[0].Pen.Width = this.Plot0Width;
-            
+
             #endregion
+            
         }
         
         
@@ -125,13 +129,27 @@ namespace AgenaTrader.UserCode
 			get { return _abstand; }
 			set { _abstand = Math.Max(0, value); }
 		}
-
+        [Description( "Neustart der Stopp-Berechnung")]
+        [InputParameter]
+        public bool Neustart
+        {
+            get { return _neuStart; }
+            set { _neuStart = value; }
+        }
+/*
+        [InputParameter]
+        public DateTime Start_Zeit
+        {
+            get { return startZeit; }
+            set { startZeit = value; }
+        }
+*/
 
         /// <summary>
         /// defines display name of indicator (e.g. in AgenaTrader chart window)
         /// </summary>
         /// <returns></returns>
-        
+
         public override string ToString()
         {
             return "Trend_Stopp (I) Trend "+ _trend;

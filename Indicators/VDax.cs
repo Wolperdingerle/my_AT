@@ -16,12 +16,13 @@ namespace AgenaTrader.UserCode
 	public class VDax : UserIndicator
 	{
         private Double r1;
-        #region Variable für die Plots
-        //input Eigenschafte der Plots
+        #region Variable fÃ¼r die OutputDescriptors
+        //input Eigenschafte der OutputDescriptors
         private Color _plot0color = Color.Blue;
         private int _plot0width = 2;
         private DashStyle _plot0dashstyle = DashStyle.Dash;
-        #endregion Plot
+        #endregion OutputDescriptor
+        
         public VDax()
 		{
             _intervall = 60;
@@ -33,15 +34,21 @@ namespace AgenaTrader.UserCode
             CalculateOnClosedBar = true;
 			AddOutput(new OutputDescriptor(_plot0color, "VDax new"));
 			IsOverlay = true;
-		}
+           
+        }
 
 		protected override void OnCalculate()
 		{
-            if(IsProcessingBarIndexLast)
+            if (IsProcessingBarIndexLast)
             {
                 r1 = (double)GlobalUtilities.GetCurrentVdaxNew(_intervall);
-                Print(Bars[0].Time +" VDax new ",  r1.ToString());
-                VDax_new.Set(r1);
+                
+                // VDax_new.Set(r1);
+                if (Chart != null)
+                {
+                    if (r1 > 0)
+                        AddChartTextFixed("MyText", "VDax new " + r1, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                }
             }
         }
 
@@ -61,9 +68,9 @@ namespace AgenaTrader.UserCode
 			set { _intervall = Math.Max(1, value); }
 		}
 		private int _intervall;
-
+/*
    
-        [Description("Select Color für VDax new")]
+        [Description("Select Color fÃ¼r VDax new")]
         [Category("Plots")]
         [DisplayName("Color Soft-Stopp")]
         public Color Plot0Color
@@ -81,7 +88,7 @@ namespace AgenaTrader.UserCode
 
         /// <summary>
         /// </summary>
-        [Description("Line width für VDax new.")]
+        [Description("Line width fÃ¼r VDax new.")]
         [Category("Plots")]
         [DisplayName("Line Soft-Stopp")]
         public int Plot0Width
@@ -92,7 +99,7 @@ namespace AgenaTrader.UserCode
 
         /// <summary>
         /// </summary>
-        [Description("DashStyle für VDax new.")]
+        [Description("DashStyle fï¿½r VDax new.")]
         [Category("Plots")]
         [DisplayName("DashStyle Soft-Stopp")]
         public DashStyle Dash0Style
@@ -100,7 +107,7 @@ namespace AgenaTrader.UserCode
             get { return _plot0dashstyle; }
             set { _plot0dashstyle = value; }
         }
-
+*/
 
         #endregion
     }

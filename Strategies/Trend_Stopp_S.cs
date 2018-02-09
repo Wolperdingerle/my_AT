@@ -10,6 +10,7 @@ using AgenaTrader.API;
 using AgenaTrader.Custom;
 using AgenaTrader.Plugins;
 using AgenaTrader.Helper;
+using AgenaTrader.UserCode;
 
 /// <summary>
 /// 
@@ -34,25 +35,25 @@ using AgenaTrader.Helper;
 namespace AgenaTrader.UserCode
 {
     [Description("Trendstopp als Softstopp mit einstellbarem Volumen")]
-
-    public class Trend_Stop : UserStrategy
+    public class Trend_Stopp_S : UserStrategy
     {
         #region Variables
         
         private int _trend = 1;                 // Trendgröße
         private int _abstand = 2;               // Abstand in Ticks vom Low
-        private double _ATR_Faktor = 1.1;       // ATR-Faktor Abstand Stopp-Limit
+        private double _LimitFaktor = 0.5;       // Faktor Abstand Stopp-Limit als fester %-Satz
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Pr0fit im Promille aktvieren
         private int _teilverkauf = 3;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
         private bool _softstopp = true;         // Softstopp statt Hardstopp nach dem 1. Stopp
         private IOrder oTStop = null;           // Trend-Stopp-Order
-        private double Stopp = 0.0;
+        public double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
         private double _profit = 5;             // Mindestprofit in Promille
         private bool _sendMail = true;         // Email nach Ausführung zusenden
         private string TStopp = "Trend ";
-        private bool TotalSchutz = true;        // frühestmöglicher Schutz für Gesamtposition nur am 1. Stopp
+        private bool TotalSchutz = false;        // frühestmöglicher Schutz für Gesamtposition nur am 1. Stopp (Vollkasko)
+        private bool _softstoppOnly = true;    // keine Hardstopp, wenn Softstopp aktiviert
         private bool _stopLimit = true;         // Stopp-Order als Stopp-Limit-Order
         private double Limit = 0.0;             // LimitPreis ist die Hälfte aus Stopp und Einstiegspreis bzw 1,5 x ATR(14) berechnet
         private double altStopp = 0.0;          // speichert alten Stopp-Preis für die Ausgabe des neuen Stopps im Ausgabefenster
@@ -63,7 +64,7 @@ namespace AgenaTrader.UserCode
         protected override void OnInit()
         {
             CalculateOnClosedBar = true;
-            RequiredBarsCount = 500;
+            RequiredBarsCount = Math.Max(10, RequiredBarsCount);
             IsAutoConfirmOrder = _automatisch;
             Abstand = _abstand;
             Teilverkauf = _teilverkauf;
@@ -77,6 +78,7 @@ namespace AgenaTrader.UserCode
             if (TotalSchutz) TStopp = TStopp + " VK";
             if (_stopLimit) TStopp = TStopp + " SL";
             if (_softstopp) TStopp = TStopp + " SS";
+            if (_softstoppOnly) TStopp = TStopp + " nur SS";
 
         }
 
@@ -144,67 +146,81 @@ namespace AgenaTrader.UserCode
 
 
                 #region Vollkasko
-                if (Stopp > 0)
-                { 
-                    if (TotalSchutz) // 1 Trend-Hardstopp für Gesamtposition setzen, wenn Position Stopp über Profit liegt
-                    {
-                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
-                            (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
-                        {
-                            // setze 1. Stopp in die Mitte des bisher aufgelaufenen Profit
-                            if(Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))   // Gewinnstopp
-                                { 
-                                Stopp = Instrument.Round2TickSize((Stopp - Trade.AvgPrice)/2 + Trade.AvgPrice);
-                                Limit = Instrument.Round2TickSize(Stopp - ATR(Close, 14)[0]);
-                                }
-                            if (_stopLimit)
-                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Trade.Quantity, Limit, Stopp, "Stopp T", TStopp);
-                            else
-                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Trade.Quantity, 0, Stopp, "Stopp T", TStopp);
-                        if (_automatisch) oTStop.ConfirmOrder();
-                        }
-
-                    }
-                    else // 1 Trend-Hardstopp für Teilposition setzen, wenn Position Stopp über Profit liegt
-                    {
-                        if ((oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
-                            (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
-                        {
-                            // setze 1. Stopp in die Mitte des bisher aufgelaufenen Profit
-                            Stopp = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
-                            Limit = Instrument.Round2TickSize(Stopp - ATR(Close, 14)[0]);
-                            if (_stopLimit)
-                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Stopp), "Stopp T" + _trend, TStopp);
-                            else
-                                oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Instrument.Round2TickSize(Stopp), "Stopp T", TStopp);
-                               
-                            if (_automatisch) oTStop.ConfirmOrder();
-
-                        }
-                    }
-                    
-                }
+                if (oTStop == null && TotalSchutz) Stueck = Trade.Quantity;
                 #endregion Vollkasko
 
-                #region Softstopp
-                if(Stopp > 0 && oTStop != null)
+                #region Hardstopp: 1. Stopp setzen
+                if(!_softstoppOnly)
                 { 
-                    if (_softstopp && Close[0] < Stopp)
+                if (Stopp > 0 &&(oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                  (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                  {
+                      // setze 1. Stopp in die Mitte des bisher aufgelaufenen Profit
+                      if(Stopp > ((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))   // Gewinnstopp
+                      { 
+                           Stopp = Instrument.Round2TickSize((Stopp - Trade.AvgPrice)/2 + Trade.AvgPrice);
+                           Limit = Instrument.Round2TickSize(Stopp * (1- _LimitFaktor/100));
+                       }
+                       if (_stopLimit)
+                           oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp T", TStopp);
+                       else
+                           oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp T", TStopp);
+                       if (_automatisch) oTStop.ConfirmOrder();
+                   }
+                }
+                #endregion
+
+
+                #region Softstopp
+                if(_softstoppOnly)
+                {
+                    if (Stopp > 0)
                     {
-                        Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
-                        Limit = Instrument.Round2TickSize(Stopp - ATR(Close, 14)[0]);
-                        
-                        if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
-                            oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                        if (_softstopp && Close[0] < Stopp)
                         {
-                            if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                            else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                            Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
+                            Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
+                            if (oTStop == null)
+                            { 
+                                if (_stopLimit)
+                                    oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp T", TStopp);
+                                else
+                                    oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp T", TStopp);
+                            }
+                            if (_automatisch) oTStop.ConfirmOrder();
+                            else
+                            { 
+                                if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                                oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                                {
+                                    if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                    else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                { 
+                    if (Stopp > 0 && oTStop != null)
+                    { 
+                       if (_softstopp && Close[0] < Stopp)
+                        {
+                            Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
+                            Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
+
+                            if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                                oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                            {
+                                if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                            }   
                         }
                     }
                 }
                 #endregion Softstopp
 
-                #region Hardstopp
+                #region Hardstopp nachziehen
                 if (Stopp > 0 && oTStop != null)
                 {
                     if ((oTStop.StopPrice < Stopp && !_softstopp) || (Stopp > oTStop.StopPrice && oTStop.StopPrice < Trade.AvgPrice))
@@ -212,10 +228,12 @@ namespace AgenaTrader.UserCode
                         if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
                             oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
                         {
-                            if(Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)) && oTStop.StopPrice < Trade.AvgPrice && TotalSchutz)    // 1. Stopp einmalig in den Gewinn ziehen.
+                            if(Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize)) && oTStop.StopPrice < Trade.AvgPrice)    // 1. Stopp einmalig in den Gewinn ziehen.
                             {
-                                if (_stopLimit) ReplaceOrder(oTStop, Trade.Quantity, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                                else ReplaceOrder(oTStop, Trade.Quantity, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                Stopp = Instrument.Round2TickSize((Stopp - Trade.AvgPrice) / 2 + Trade.AvgPrice);
+                                Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
+                                if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
                             }
                             else
                             { 
@@ -228,38 +246,36 @@ namespace AgenaTrader.UserCode
                 #endregion Hardstopp
 
                 #region Trend-Stopp-Berechnung: 
-                if(Bars[2] != null && Bars[2].Time > Trade.CreatedDateTime )
-                { 
-                if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize)));       //im Aufwärtstrend: P3 gültig
-                else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize));            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
-                else if (P123Adv(_trend).P2Price[0] < P123Adv(_trend).P1Price[0] && P123Adv(_trend).TempP3DateTime[0] > P123Adv(_trend).P2DateTime[0]
-                       && P123Adv(_trend).P2DateTime[0] < P123Adv(_trend).TempP3DateTime[0])
-                    Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: TempP3 gültig, Stopp am letztenP2
-            //    else if (P123Adv(_trend).P2DateTime[0] < Trade.CreatedDateTime)
-            //        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: P2 vor Kauf, Stopp am gültigen P2
-
-                Limit = Instrument.Round2TickSize(Stopp - ATR(Close, 14)[0]);
+                if(Bars[2].Time > Trade.CreatedDateTime )
+                {
+                    if (P123Adv(_trend).ValidP3Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).ValidP3DateTime[0] > P123Adv(_trend).P1DateTime[0])
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).ValidP3Price[0] - _abstand * TickSize)));       //im Aufwärtstrend: P3 gültig
+                    else if (P123Adv(_trend).ValidP3Price[0] < 1 && P123Adv(_trend).P2Price[0] > P123Adv(_trend).P1Price[0] && P123Adv(_trend).P2DateTime[0] > P123Adv(_trend).P1DateTime[0])
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P1Price[0]) - _abstand * TickSize));            // im Aufwärtsttrend, noch kein P3 vorhanden,  Stopp am P1
+                    else if (P123Adv(_trend).P2Price[0] < P123Adv(_trend).P1Price[0] && P123Adv(_trend).TempP3DateTime[0] > P123Adv(_trend).P2DateTime[0]
+                           && P123Adv(_trend).P2DateTime[0] < P123Adv(_trend).TempP3DateTime[0])
+                        Stopp = Instrument.Round2TickSize(Math.Max(Stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: TempP3 gültig, Stopp am letztenP2
+                    
+                        Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
                 }
                 #endregion Trend-Stopp-Berechnung
-
-
-
-
+                
             }
             #region Anzeige
-            if (Stopp > 0 && altStopp != Stopp)
+            if (altStopp != Stopp)
             {
-                if (_stopLimit) Print(Bars[0].Time.ToShortTimeString() + " " + Instrument.Symbol + " Stopp: " + Stopp.ToString("F2") + " Limit: " + Limit.ToString("F2"));
-                else Print(Instrument.Symbol + " Stopp: " + Stopp.ToString("F2"));
+                if (_stopLimit) Print(Bars[0].Time + " " + Instrument.Symbol + " Stopp: " + Stopp.ToString("F2") + " Limit: " + Limit.ToString("F2"));
+                else Print(Bars[0].Time + " " + Instrument.Symbol + " Stopp: " + Stopp.ToString("F2"));
                 altStopp = Stopp;
             }
             if (Chart != null)
             {
                 //  _Test2Plot.Zeichne(Stopp, oStop.StopPrice);
                 if (oTStop == null)
-                    AddChartTextFixed("MyText", "Trendstopp aktiv, Trend " + _trend + " Teilverkäufe: " + _teilverkauf, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                    if (altStopp != Stopp)
+                        AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                    else
+                        AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
                 else
                 {
                     if (oTStop.OrderState == OrderState.Filled)
@@ -267,26 +283,26 @@ namespace AgenaTrader.UserCode
                     else
                       if (_softstopp)
                         AddChartTextFixed("MyText", "Softstopp aktiv, Trend " + _trend + " Softstopp: " + Stopp.ToString("F2") +
-                          " G/V " + ((oTStop.StopPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                          " G/V " + ((oTStop.StopPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € " + TStopp, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
                     else
                     {
                         if (_stopLimit)
                             AddChartTextFixed("MyText", "Trendstopp aktiv, Trend " + _trend +
-                              " G/V " + ((oTStop.LimitPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                              " G/V " + ((oTStop.LimitPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € " + TStopp, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
                         else
                             AddChartTextFixed("MyText", "Trendstopp aktiv, Trend " + _trend +
-                              " G/V " + ((oTStop.StopPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € ", TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                              " G/V " + ((oTStop.StopPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € " + TStopp, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
                     }
                 }      
             }
             #endregion Anzeige
         }
 
-
+     
         #region Properties
-        
+
         [Description("Anzahl Teilverkäufe")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Teilverkauf
         {
             get { return _teilverkauf; }
@@ -294,7 +310,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("nur Gewinn-Stopp")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool ProfitOnly
         {
             get { return _profitOnly; }
@@ -303,15 +319,24 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Soft-Stopp statt Hardstopp")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool SoftStopp
         {
             get { return _softstopp; }
             set { _softstopp = value; }
         }
 
+        [Description("ausschließlich Soft-Stopp, kein Hardstopp")]
+        [InputParameter]
+        public bool Soft_Only
+        {
+            get { return _softstoppOnly; }
+            set { _softstoppOnly = value; }
+        }
+        
+
         [Description("Mindest-Profit in Promille")]
-        [Category("Parameters")]
+        [InputParameter]
         public double Profit
         {
             get { return _profit; }
@@ -320,7 +345,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Trendgrösse (0 -3)")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Trend
         {
             get { return _trend; }
@@ -329,7 +354,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Tick-Abstand")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Abstand
         {
             get { return _abstand; }
@@ -337,17 +362,17 @@ namespace AgenaTrader.UserCode
         }
 
 
-        [Description("ATR-Faktor Abstand Stopp-Limit-Preis")]
-        [Category("Parameters")]
-        public double ATR_Faktor
+        [Description("%-Faktor Abstand Stopp-Limit-Preis")]
+        [InputParameter]
+        public double Limit_Faktor
         {
-            get { return _ATR_Faktor; }
-            set { _ATR_Faktor = value; }
+            get { return _LimitFaktor; }
+            set { _LimitFaktor = value; }
         }
 
 
         [Description("Stopp-Limit-Order")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool StopLimit
         {
             get { return _stopLimit; }
@@ -355,7 +380,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Vollkasko für die Gesamtposition")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool Vollkasko
         {
             get { return TotalSchutz; }
@@ -364,13 +389,34 @@ namespace AgenaTrader.UserCode
         
 
         [Description("SendMail")]
-        [Category("Parameters")]
+        [InputParameter]
 
         public bool SendMail
         {
             get { return _sendMail; }
             set { _sendMail = value; }
         }
+
+        /// <summary>
+        /// defines display name of indicator (e.g. in AgenaTrader chart window)
+        /// </summary>
+        /// <returns></returns>
+        public override string ToString()
+        {
+            return "Trend-Stopp (S)";
+        }
+
+        /// <summary>
+        /// defines display name of indicator (e.g. in AgenaTrader indicator selection window)
+        /// </summary>
+        public override string DisplayName
+        {
+            get
+            {
+                return "Trend-Stopp (S)";
+            }
+        }
+
     }
 }
         #endregion Properties

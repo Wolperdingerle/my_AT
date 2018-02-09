@@ -46,7 +46,7 @@ namespace AgenaTrader.UserCode
 		}
 
 		[Description("Tage für Durchschnittsvolumen")]
-		[Category("Parameters")]
+		[InputParameter]
 		public int Tage
 		{
 			get { return _tage; }

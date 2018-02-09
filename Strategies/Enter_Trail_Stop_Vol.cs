@@ -151,7 +151,7 @@ namespace AgenaTrader.UserCode
 		#region Properties
 
 		[Description("Kapital für Einstieg, min. 4.000 €")]
-		[Category("Parameters")]
+		[InputParameter]
 		public int Kapital
 		{
 			get { return _kapital; }
@@ -160,7 +160,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Tickabstand")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Abstand
         {
             get { return _abstand; }
@@ -168,7 +168,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Abstand Stopp - LimitTickabstand in Ticks")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Delta
         {
             get { return _delta; }
@@ -176,7 +176,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Bars back für Trailing Stop")]
-		[Category("Parameters")]
+		[InputParameter]
 		public int BarBack
         {
 			get { return _barBack; }
@@ -184,7 +184,7 @@ namespace AgenaTrader.UserCode
 		}
 
         [Description("StopLimit-Order")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool StopLimit
         {
             get { return _stopLimit; }
@@ -192,7 +192,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("SendMail")]
-        [Category("Parameters")]
+        [InputParameter]
 
         public bool SendMail
         {
@@ -202,7 +202,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Automatisch")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool Automatisch
         {
             get { return _automatisch; }

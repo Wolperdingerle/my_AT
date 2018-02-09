@@ -337,7 +337,7 @@ namespace AgenaTrader.UserCode
         #region Properties
 
         [Description("nur Trendstopp")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool TrenStoppOnly
         {
             get { return _trendStoppOnly; }
@@ -345,7 +345,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Anzahln Teilverkäufe")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Teilverkauf
         {
             get { return _teilverkauf; }
@@ -353,7 +353,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Soft-Stopp")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool SoftStopp
         {
             get { return _softstopp; }
@@ -361,7 +361,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("nur Gewinn-Stopp")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool ProfitOnly
         {
             get { return _profitOnly; }
@@ -369,7 +369,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Mindest-Profit in Promille")]
-        [Category("Parameters")]
+        [InputParameter]
         public double Profit
         {
             get { return _profit; }
@@ -378,7 +378,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Trendgrösse (0 -3)")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Trend
         {
             get { return _trend; }
@@ -387,7 +387,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Tick-Abstand")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Abstand
         {
             get { return _abstand; }
@@ -396,7 +396,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Toleranz-Abstand für InsideBars in Tick")]
-        [Category("Parameters")]
+        [InputParameter]
         public int Toleranz
         {
             get { return _toleranz; }
@@ -405,7 +405,7 @@ namespace AgenaTrader.UserCode
 
 
         [Description("Stopp-Limit-Order")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool StopLimit
         {
             get { return _stopLimit; }
@@ -413,7 +413,7 @@ namespace AgenaTrader.UserCode
         }
 
         [Description("Vollkasko für die Gesamtposition")]
-        [Category("Parameters")]
+        [InputParameter]
         public bool Vollkasko
         {
             get { return TotalSchutz; }
@@ -422,7 +422,7 @@ namespace AgenaTrader.UserCode
         
 
         [Description("SendMail")]
-        [Category("Parameters")]
+        [InputParameter]
 
         public bool SendMail
         {
