@@ -34,6 +34,19 @@ using AgenaTrader.UserCode;
 
 namespace AgenaTrader.UserCode
 {
+    public class Price 
+    {
+        public double StoppPreis;
+
+     
+        public static void DoPreisHolen()
+        {
+          //  StoppPreis = UserCode.Trend_Stopp_S
+          
+        }
+    }
+
+
     [Description("Trendstopp als Softstopp mit einstellbarem Volumen")]
     public class Trend_Stopp_S : UserStrategy
     {
@@ -49,7 +62,7 @@ namespace AgenaTrader.UserCode
         private IOrder oTStop = null;           // Trend-Stopp-Order
         public double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
-        private double _profit = 5;             // Mindestprofit in Promille
+        private double _profit = 10;             // Mindestprofit in Promille
         private bool _sendMail = true;         // Email nach Ausführung zusenden
         private string TStopp = "Trend ";
         private bool TotalSchutz = false;        // frühestmöglicher Schutz für Gesamtposition nur am 1. Stopp (Vollkasko)
@@ -69,16 +82,17 @@ namespace AgenaTrader.UserCode
             Abstand = _abstand;
             Teilverkauf = _teilverkauf;
             TraceOrders = true;
+            TStopp = TStopp + _trend;
+            if (TotalSchutz) TStopp = TStopp + " VK";
+            if (_stopLimit) TStopp = TStopp + " SL";
+            if (!_softstoppOnly && _softstopp) TStopp = TStopp + " SS";
+            if (_softstoppOnly) TStopp = TStopp + " nur SS";
 
         }
         protected override void OnStart()
         {
             base.OnStart();
-            TStopp = TStopp + _trend;
-            if (TotalSchutz) TStopp = TStopp + " VK";
-            if (_stopLimit) TStopp = TStopp + " SL";
-            if (_softstopp) TStopp = TStopp + " SS";
-            if (_softstoppOnly) TStopp = TStopp + " nur SS";
+            
 
         }
 
@@ -91,7 +105,7 @@ namespace AgenaTrader.UserCode
                 {
                     if (_sendMail && Core.PreferenceManager.DefaultEmailAddress != "") this.SendEmail(Core.AccountManager.Core.Settings.MailDefaultFromAddress, Core.PreferenceManager.DefaultEmailAddress,
                          execution.Instrument.Symbol + " Order " + execution.Name + " ausgeführt.",
-                         execution.Instrument.Symbol + "Trend-Stop-Order " + execution.Name + " ausgeführt. Profit:" + (Trade.ClosedProfitLoss - execution.Commission).ToString("F2"));
+                         execution.Instrument.Symbol + "Trend-Stop-Order " + execution.Name + " ausgeführt. Profit:" + (execution.Quantity * (execution.Price - Trade.AvgPrice)- execution.Commission).ToString("F2"));
 
                     Stopp = 0;
                     oTStop = null; // Objekt löschen, damit startet Trendstopp erneut.
@@ -178,7 +192,7 @@ namespace AgenaTrader.UserCode
                     {
                         if (_softstopp && Close[0] < Stopp)
                         {
-                            Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
+                            Stopp = Instrument.Round2TickSize(Low[0] - _abstand * TickSize);
                             Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
                             if (oTStop == null)
                             { 
@@ -206,7 +220,7 @@ namespace AgenaTrader.UserCode
                     { 
                        if (_softstopp && Close[0] < Stopp)
                         {
-                            Stopp = Instrument.Round2TickSize(Close[0] - _abstand * TickSize);
+                            Stopp = Instrument.Round2TickSize(Low[0] - _abstand * TickSize);
                             Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
 
                             if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
@@ -273,14 +287,16 @@ namespace AgenaTrader.UserCode
                 //  _Test2Plot.Zeichne(Stopp, oStop.StopPrice);
                 if (oTStop == null)
                     if (altStopp != Stopp)
-                        AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                    {
+                        if(_stopLimit)
+                            AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2" + " Limit:: " + Limit.ToString("F2")), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                        else
+                            AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
+                    }
                     else
                         AddChartTextFixed("MyText", "Trendstopp aktiv, Teilverkäufe: " + _teilverkauf + " " + TStopp + " Stopp: " + Stopp.ToString("F2"), TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
                 else
                 {
-                    if (oTStop.OrderState == OrderState.Filled)
-                        AddChartTextFixed("MyText", "Trendstopp ausgeführt", TextPosition.BottomLeft, Color.Red, new Font("Areal", 14), Color.Blue, Color.Empty, 10);
-                    else
                       if (_softstopp)
                         AddChartTextFixed("MyText", "Softstopp aktiv, Trend " + _trend + " Softstopp: " + Stopp.ToString("F2") +
                           " G/V " + ((oTStop.StopPrice - Trade.AvgPrice) * Stueck).ToString("F2") + " € " + TStopp, TextPosition.BottomLeft, Color.Red, new Font("Areal", 12), Color.Blue, Color.Empty, 10);
@@ -298,8 +314,16 @@ namespace AgenaTrader.UserCode
             #endregion Anzeige
         }
 
-     
+
         #region Properties
+        [Parameter]
+     
+        [Browsable(false)]
+        public double StoppPreis
+        {
+            get { return Stopp; }
+            set { Stopp = value; }
+        }
 
         [Description("Anzahl Teilverkäufe")]
         [InputParameter]
@@ -403,7 +427,7 @@ namespace AgenaTrader.UserCode
         /// <returns></returns>
         public override string ToString()
         {
-            return "Trend-Stopp (S)";
+            return "Trend-Stopp (S)"; //+ TStopp);
         }
 
         /// <summary>
@@ -413,7 +437,7 @@ namespace AgenaTrader.UserCode
         {
             get
             {
-                return "Trend-Stopp (S)";
+                return "Trend-Stopp (S) " + TStopp;
             }
         }
 

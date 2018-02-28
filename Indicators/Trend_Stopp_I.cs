@@ -19,7 +19,9 @@ namespace AgenaTrader.UserCode
     public class Trend_Stopp : UserIndicator
 	{
         #region Variable für die Plots
-        private Color _plot0color = Color.Blue;
+        private Color _plot0Color = Color.Blue;
+        private Color _verlustcolor = Color.Blue;
+        private Color _gewinncolor = Color.Green;
         private int _plot0width = 2;
         private DashStyle _plot0dashstyle = DashStyle.Dash;
         #endregion für die Plots
@@ -37,12 +39,12 @@ namespace AgenaTrader.UserCode
         protected override void OnInit()
 		{
             //Define the plots and its color which is displayed in the chart
-            Add(new OutputDescriptor(Plot0Color, "Soft_Stopp"));
+            Add(new OutputDescriptor(_plot0Color, "Soft_Stopp"));
             RequiredBarsCount = Math.Max(3,RequiredBarsCount);
             IsOverlay = true;
             if (TradeInfo != null && TradeInfo.Quantity != 0)
             {
-                stueck = TradeInfo.Quantity;
+                //stueck = TradeInfo.Quantity;
                 startZeit = TradeInfo.CreatedDateTime;
             }
             
@@ -50,7 +52,9 @@ namespace AgenaTrader.UserCode
 
 		protected override void OnCalculate()
 		{
-            if (!IsProcessingBarIndexLast || TradeInfo == null || (TradeInfo != null && TradeInfo.Quantity == 0 )) return;     // kein Trade offen, nur letzten Bar berechnen
+
+            
+            if ( TradeInfo == null || (TradeInfo != null && TradeInfo.Quantity == 0 )) return;     // kein Trade offen, nur letzten Bar berechnen
             #region Timeframe
             //Check if peridocity is valid for this script
             if (!DatafeedPeriodicityIsValid(Bars.TimeFrame))
@@ -60,14 +64,14 @@ namespace AgenaTrader.UserCode
             }
             #endregion Timeframe
 
-            if (_neuStart && IsProcessingBarIndexLast)
+            if (Soft_Stopp[2] > Close[1])
             {
-                startZeit = Bars[1].Time;
+                startZeit = Bars[2].Time;
                 _neuStart = false;
                 _stopp = 0;
-                return;
+                //return;
             }
-
+            if (Core.PreferenceManager.IsAtrEntryDistance) _abstand = (int)Math.Max(_abstand, ATR(14)[1] * Core.PreferenceManager.AtrEntryDistanceFactor);    // Tick-Abstand
             if (TradeInfo.Quantity != stueck)   // Kauf oder Teilverkauf hat stattgefunden
             {
                 stueck = TradeInfo.Quantity;
@@ -89,7 +93,13 @@ namespace AgenaTrader.UserCode
                // _stopp = Instrument.Round2TickSize(Math.Max(_stopp, (P123Adv(_trend).P2Price[0]) - _abstand * TickSize));           //im Abwärtstrend: P2 vor Kauf, Stopp am gültigen P2
              
                 if (_stopp > 0)
+                { 
                     Soft_Stopp.Set(_stopp);     // zeigt Verlauf Softstopp
+                    if(_stopp > 1.005 * TradeInfo.AvgPrice)
+                        _plot0Color = _gewinncolor;
+                    else
+                        _plot0Color = _verlustcolor;
+                }
                 else
                     Soft_Stopp.Reset();
             }
@@ -97,7 +107,7 @@ namespace AgenaTrader.UserCode
 
             #region Ploteinstellungen ändern
             //Set the drawing style, if the user has changed it.
-            PlotColors[0][0] = this.Plot0Color;
+            PlotColors[0][0] = this._plot0Color;
             OutputDescriptors[0].PenStyle = this.Dash0Style;
             OutputDescriptors[0].Pen.Width = this.Plot0Width;
 
@@ -136,14 +146,6 @@ namespace AgenaTrader.UserCode
             get { return _neuStart; }
             set { _neuStart = value; }
         }
-/*
-        [InputParameter]
-        public DateTime Start_Zeit
-        {
-            get { return startZeit; }
-            set { startZeit = value; }
-        }
-*/
 
         /// <summary>
         /// defines display name of indicator (e.g. in AgenaTrader chart window)
@@ -188,20 +190,42 @@ namespace AgenaTrader.UserCode
         /// </summary>
         /// <summary>
         /// </summary>
+        /// 
+        /*
         [Description("Select Color für Soft-Stopp.")]
         [Category("Plots")]
         [DisplayName("Color Soft-Stopp")]
+    
         public Color Plot0Color
         {
             get { return _plot0color; }
             set { _plot0color = value; }
         }
+    */
+
+        [Description("Wähle Farbe für Gewinn-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("Color Gewinn_Stopp")]
+        public Color GewinnColor
+        {
+            get { return _gewinncolor; }
+            set { _gewinncolor = value; }
+        }
+
+        [Description("Wähle Farbe für Verlust-Stopp.")]
+        [Category("Plots")]
+        [DisplayName("Color Verlust-Stopp")]
+        public Color VerlustColor
+        {
+            get { return _verlustcolor; }
+            set { _verlustcolor = value; }
+        }
         // Serialize Color object
         [Browsable(false)]
         public string Plot0ColorSerialize
         {
-            get { return SerializableColor.ToString(_plot0color); }
-            set { _plot0color = SerializableColor.FromString(value); }
+            get { return SerializableColor.ToString(_plot0Color); }
+            set { _plot0Color = SerializableColor.FromString(value); }
         }
 
         /// <summary>
