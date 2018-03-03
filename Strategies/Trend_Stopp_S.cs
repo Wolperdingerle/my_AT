@@ -54,7 +54,7 @@ namespace AgenaTrader.UserCode
         
         private int _trend = 1;                 // Trendgröße
         private int _abstand = 2;               // Abstand in Ticks vom Low
-        private double _LimitFaktor = 0.5;       // Faktor Abstand Stopp-Limit als fester %-Satz
+        private double _LimitFaktor = 0.4;       // Faktor Abstand Stopp-Limit als fester %-Satz
         private bool _automatisch = true;       // Stopp-Order wird automatisch aktiviert
         private bool _profitOnly = true;        // Stopp-Order erst über Pr0fit im Promille aktvieren
         private int _teilverkauf = 3;           // Anzahl Teilverkäufe für die Position; Mindeszgröße 4.000 EUR
@@ -62,7 +62,7 @@ namespace AgenaTrader.UserCode
         private IOrder oTStop = null;           // Trend-Stopp-Order
         public double Stopp = 0.0;
         private int Stueck = 0;                 // Menge zu verkaufen
-        private double _profit = 10;             // Mindestprofit in Promille
+        private double _profit = 6;             // Mindestprofit in Promille
         private bool _sendMail = true;         // Email nach Ausführung zusenden
         private string TStopp = "Trend ";
         private bool TotalSchutz = false;        // frühestmöglicher Schutz für Gesamtposition nur am 1. Stopp (Vollkasko)
@@ -154,7 +154,9 @@ namespace AgenaTrader.UserCode
                 else Stueck = (int)(Trade.Quantity / _teilverkauf);
 
                 if (Trade.Quantity * Trade.AvgPrice < 8000) Stueck = Trade.Quantity;
-
+                // neu: Rundungab 100 auf 10, ab 1000 auf 100
+                if (Stueck > 1000) Stueck = 10* (int)((Stueck +50) / 10);
+                else if(Stueck > 100) Stueck = 10 * (int)((Stueck + 5) / 10);
 
                 #endregion Stueck
 
@@ -188,27 +190,32 @@ namespace AgenaTrader.UserCode
                 #region Softstopp
                 if(_softstoppOnly)
                 {
-                    if (Stopp > 0)
+                    if (Stopp > 0 && (oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled)) &&
+                       (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
                     {
                         if (_softstopp && Close[0] < Stopp)
                         {
                             Stopp = Instrument.Round2TickSize(Low[0] - _abstand * TickSize);
                             Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
-                            if (oTStop == null)
-                            { 
-                                if (_stopLimit)
-                                    oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp T", TStopp);
+                            if(oTStop == null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled) &&
+                             (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
+                             { 
+                                if (oTStop == null)
+                                { 
+                                    if (_stopLimit)
+                                        oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.StopLimit, Stueck, Limit, Stopp, "Stopp T", TStopp);
+                                    else
+                                        oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp T", TStopp);
+                                }
+                                if (_automatisch) oTStop.ConfirmOrder();
                                 else
-                                    oTStop = SubmitOrder(0, OrderDirection.Sell, OrderType.Stop, Stueck, 0, Stopp, "Stopp T", TStopp);
-                            }
-                            if (_automatisch) oTStop.ConfirmOrder();
-                            else
-                            { 
-                                if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
-                                oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
-                                {
+                                { 
+                                    if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                                        oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                                    {
                                     if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
                                     else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                    }
                                 }
                             }
                         }
@@ -222,13 +229,16 @@ namespace AgenaTrader.UserCode
                         {
                             Stopp = Instrument.Round2TickSize(Low[0] - _abstand * TickSize);
                             Limit = Instrument.Round2TickSize(Stopp * (1 - _LimitFaktor / 100));
-
-                            if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
-                                oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                            if (oTStop != null || (oTStop != null && oTStop.OrderState == OrderState.Cancelled) &&
+                                 (!_profitOnly || (_profitOnly && (Stopp > Instrument.Round2TickSize(((1 + _profit / 1000) * Trade.AvgPrice + _abstand * TickSize))))))
                             {
-                                if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                                else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
-                            }   
+                                if (oTStop.OrderState != OrderState.Filled && oTStop.OrderState != OrderState.PendingSubmit &&
+                                oTStop.OrderState != OrderState.PendingReplace && oTStop.OrderState != OrderState.PartFilled)
+                                {
+                                    if (_stopLimit) ReplaceOrder(oTStop, Stueck, Instrument.Round2TickSize(Limit), Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                    else ReplaceOrder(oTStop, Stueck, 0, Instrument.Round2TickSize(Math.Max(oTStop.StopPrice, Stopp)));
+                                }
+                            }
                         }
                     }
                 }
